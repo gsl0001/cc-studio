@@ -1,0 +1,40 @@
+{
+  "name": "cc-studio",
+  "version": "0.1.0",
+  "description": "An open-source content assistant: plans your week of short videos, makes them with Claude, sends each to you for approval, and schedules them on TikTok and Instagram. With cc, a desktop companion you can talk to.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "login": "node src/setup.js",
+    "tasks:install": "node scripts/tasks.mjs install",
+    "tasks:uninstall": "node scripts/tasks.mjs uninstall",
+    "voice:install": "node scripts/voice-install.mjs",
+    "avatar": "node scripts/avatar.mjs",
+    "cc": "powershell -NoProfile -STA -ExecutionPolicy Bypass -File scripts/cc.ps1",
+    "test": "node scripts/test.mjs",
+    "publish": "node src/publish.js",
+    "status": "node src/status.js",
+    "plan": "node src/strategist.js",
+    "metrics": "node src/metrics.js",
+    "insights": "node src/insights.js",
+    "strategist": "node auto_content_pipeline/scripts/weekly-strategist.mjs",
+    "export-performance": "node src/export-performance.js",
+    "analyze": "node src/analyze.js",
+    "desk": "node src/server.js",
+    "check": "node src/authcheck.js",
+    "registry": "node src/registry.js",
+    "library": "node src/library.js",
+    "queue": "node src/queue.js",
+    "tick": "node scripts/tick.mjs",
+    "pulse": "node scripts/pulse.mjs",
+    "creator": "node scripts/creator.mjs",
+    "bot": "node scripts/telegram-bot.mjs",
+    "logs": "node scripts/logs.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "example",
+  "name": "Acme Notes",
+  "type": "app",
+  "category": "productivity",
+  "site_url": "https://example.com",
+  "positioning": {
+    "one_liner": "A notes app that turns a messy page into a tidy checklist in one tap.",
+    "problem": "Notes pile up as walls of text nobody acts on.",
+    "audience": ["students", "freelancers", "people who live in to-do lists"]
+  },
+  "languages": ["en"],
+  "language_note": "English only.",
+  "features": ["one-tap checklist from any note", "offline first", "home-screen widgets"],
+  "approved_claims": [
+    "Turns a note into a checklist in one tap.",
+    "Works offline.",
+    "Free to try."
+  ],
+  "forbidden_claims": [
+    "uses AI (it doesn't)",
+    "syncs with every app",
+    "the fastest notes app"
+  ],
+  "cta": { "primary": "Free on the App Store, link in bio" },
+  "content": {
+    "preferred_duration_seconds": [8, 20],
+    "preferred_styles": ["problem_solution", "feature_demo", "pov_scenario"]
+  },
+  "pronounce": { "Acme": "Ack-me" },
+  "accounts": [
+    {
+      "id": "example-tiktok",
+      "name": "Acme Notes",
+      "platform": "tiktok",
+      "handle": "acmenotes",
+      "slots": ["18:00"],
+      "lead_days": 7,
+      "can_schedule": true,
+      "mode": "SCHEDULE",
+      "allow_final": false,
+      "enabled": false,
+      "style": {
+        "group": "example",
+        "pillar": "One messy-notes moment per video, fixed on screen in the first 2 seconds",
+        "voice": "Friendly and quick, first person, short spoken lines",
+        "formats": [
+          "problem_solution: the mess in 1 second, the one-tap fix (8-12s)",
+          "pov_scenario: the night before a deadline",
+          "feature_demo: one feature, start to finish, under 15s"
+        ],
+        "differentiator": "Sells the feeling of a tidy list; never a feature tour."
+      }
+    }
+  ]
+}

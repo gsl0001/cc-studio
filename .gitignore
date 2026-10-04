@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Your configuration and secrets
+.env
+studio.config.json
+content/CONTEXT.md
+apps/*
+!apps/example/
+
+# Logins (a browser profile IS a credential)
+browser-profile/
+
+# State, media and logs the pipeline writes
+data/
+queue/
+queue-archive/
+finals/
+workspaces/
+workspace/
+evidence/
+reports/
+backups/
+logs/
+auto_content_pipeline/output/
+voice/
+cc-avatar/
+__pycache__/
+*.pyc
+
+# Run-time flags
+STOP_AUTOMATION
+METRICS_RUNNING
+CREATOR_RUNNING
+CLAUDE_QUOTA
+SCHEDULING
+
+# Editors and agents
+.claude/settings.local.json
+.serena/
+.vscode/
+.idea/
+
+# The maintainer's private build checkpoint
+HANDOVER.md

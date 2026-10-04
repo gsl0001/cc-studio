@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cc-studio desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0B1220;        /* deep indigo night */
+  --panel: #101A2D;
+  --panel-2: #0D1626;
+  --line: #1D2A42;
+  --line-2: #2A3B58;
+  --moon: #E8EDF5;       /* primary text */
+  --rain: #9DBBDA;       /* data, secondary */
+  --rain-dim: #7A93B8;
+  --lamp: #F5B84A;       /* the on-air amber */
+  --alert: #E4674F;
+  --ok: #6FBF9A;
+  --console-h: 0px;
+
+  /* one hue per meaning, used for status, never for decoration */
+  --violet: #A98BF0;     /* in flight — a runner holds it right now */
+  --cyan: #5FC4D6;       /* waiting its turn */
+  --grey: #6E86A8;       /* out of play */
+  --ig: #E1699F;         /* instagram */
+  --tt: #3FD0DC;         /* tiktok */
+
+  /* type scale — 1.25 between steps; nothing below 12px */
+  --fs-micro: .75rem;      /* 12px — uppercase labels, tags, chips */
+  --fs-body: .9375rem;     /* 15px — rows, logs, prose, inputs */
+  --fs-lead: 1.1875rem;    /* 19px — the name of a thing */
+  --fs-title: 1.5rem;      /* 24px — masthead */
+  --fs-display: 1.875rem;  /* 30px — the number you read from across the room */
+}
+* { box-sizing: border-box; margin: 0; }
+[hidden] { display: none !important; }
+html { background: var(--ink); }
+body {
+  font-family: "Archivo", sans-serif;
+  color: var(--moon);
+  min-height: 100vh;
+  padding-bottom: var(--console-h);
+  background: var(--ink);
+}
+.mono, .m { font-family: "Spline Sans Mono", monospace; }
+a { color: var(--rain); }
+
+/* ---------- masthead ---------- */
+header {
+  display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
+  padding: 1rem 1.6rem .85rem;
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 30;
+  background: color-mix(in srgb, var(--ink) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+h1 {
+  font-variation-settings: "wdth" 125, "wght" 800;
+  text-transform: uppercase; letter-spacing: .04em; font-size: var(--fs-title);
+}
+h1 span { color: var(--rain); font-variation-settings: "wdth" 125, "wght" 300; }
+.lamp {
+  display: flex; align-items: center; gap: .5rem;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--rain);
+}
+.lamp-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lamp);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--lamp) 55%, transparent); }
+.lamp.alert .lamp-dot { background: var(--alert); box-shadow: 0 0 12px 2px color-mix(in srgb, var(--alert) 55%, transparent); }
+.lamp.off .lamp-dot { background: var(--rain-dim); box-shadow: none; }
+@keyframes breathe { 50% { opacity: .45; } }
+.head-actions { margin-left: auto; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.tick-note { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); color: var(--rain-dim); }
+
+/* ---------- tabs ---------- */
+nav.tabs { display: flex; gap: .15rem; padding: 0 1.6rem; border-bottom: 1px solid var(--line);
+  position: sticky; top: 57px; z-index: 25; background: color-mix(in srgb, var(--ink) 92%, transparent);
+  backdrop-filter: blur(8px); overflow-x: auto; }
+nav.tabs button {
+  display: flex; align-items: center; gap: .5em;
+  border: none; border-bottom: 2px solid transparent; border-radius: 0;
+  padding: .7rem .9rem; font-size: var(--fs-micro); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--rain-dim); background: none; white-space: nowrap;
+}
+nav.tabs button:hover { color: var(--moon); border-color: var(--line-2); }
+nav.tabs button[aria-selected="true"] { color: var(--moon); border-color: var(--lamp); }
+nav.tabs .count { color: var(--alert); margin-left: .35rem; }
+
+main { padding: 1.4rem 1.6rem 3rem; display: grid; gap: 1.2rem; }
+.cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.2rem; align-items: start; }
+section h2 {
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--rain-dim);
+  margin-bottom: .7rem; display: flex; align-items: center; gap: .6rem;
+}
+section h2 .right { margin-left: auto; display: flex; gap: .35rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 1rem 1.1rem; margin-bottom: 1.2rem; }
+.card.tight { padding: .55rem .7rem; }
+
+/* ---------- stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.tile { background: var(--panel-2); padding: .85rem 1rem; }
+.tile .k { display: flex; align-items: center; gap: .45em;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); letter-spacing: .14em;
+  text-transform: uppercase; color: var(--rain-dim); }
+.tile .k .i { color: var(--tone, var(--rain-dim)); }
+.tile .v { font-size: var(--fs-display); font-variation-settings: "wght" 700; margin-top: .2rem; line-height: 1; }
+.tile .v small { font-size: var(--fs-body); color: var(--rain-dim); font-variation-settings: "wght" 400; }
+.tile .v { color: var(--tone, var(--moon)); }
+
+/* ---------- schedule rail ---------- */
+.rail { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden; }
+.account-rail { background: var(--line); display: grid; gap: 1px; }
+.account-head { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+  padding: .5rem .7rem; font-size: var(--fs-body); background: var(--panel);
+  border-left: 3px solid var(--platform); }
+.account-head b { font-size: var(--fs-lead); font-variation-settings: "wght" 700; }
+.account-head .platform-mark { display: flex; align-items: center; }
+.tags { display: flex; gap: .3rem; flex-wrap: wrap; margin-right: auto; }
+.tag { display: inline-flex; align-items: center; gap: .3em;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); padding: .1rem .4rem;
+  border: 1px solid var(--line-2); border-radius: 3px; color: var(--rain); }
+.tag.bad { color: var(--alert); border-color: var(--alert); }
+.tag.good { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.tag.amber { color: var(--lamp); border-color: color-mix(in srgb, var(--lamp) 50%, transparent); }
+.account-note { font-size: var(--fs-body); color: var(--alert); padding: .1rem .7rem .4rem; background: var(--panel); }
+.rail-days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; }
+.slot { background: var(--panel-2); padding: .8rem .9rem .9rem; min-height: 92px; }
+.slot .when { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--rain-dim); }
+.slot .title { margin-top: .4rem; font-size: var(--fs-body); font-variation-settings: "wght" 600;
+  word-break: break-all; }
+.slot .sub { margin-top: .25rem; font-family: "Spline Sans Mono", monospace;
+  font-size: var(--fs-micro); color: var(--rain); }
+.slot .title { display: flex; align-items: center; gap: .45em; color: var(--tone, var(--moon)); }
+.slot .title .i { flex: none; }
+.slot .sub { color: var(--rain); }
+/* a day with nothing in it is the one thing you want to spot from the doorway */
+.slot.empty { background: color-mix(in srgb, var(--alert) 7%, var(--panel-2)); }
+
+/* ---------- content library ---------- */
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: .6rem; }
+.thumb { position: relative; border: 1px solid var(--line); border-radius: 7px;
+         background: var(--panel-2); overflow: hidden; }
+.thumb img { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+             background: var(--panel-2); }
+.thumb .no-frame { display: grid; place-items: center; aspect-ratio: 9 / 16;
+                   color: var(--rain-dim); font-size: var(--fs-micro); }
+.thumb .dur { position: absolute; top: .3rem; right: .3rem; padding: .05rem .3rem; border-radius: 4px;
+              background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--rain);
+              font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); }
+.thumb .who { padding: .35rem .4rem .4rem; display: flex; align-items: center; gap: .3em;
+              font-size: var(--fs-micro); color: var(--rain); line-height: 1.25; }
+.thumb .who .i { flex: none; color: var(--tone, var(--rain-dim)); }
+.thumb.is-unused { border-color: color-mix(in srgb, var(--lamp) 45%, transparent); }
+.thumb.is-unused .who { color: var(--lamp); }
+.thumb.is-reused { border-color: color-mix(in srgb, var(--violet) 45%, transparent); }
+
+/* ---------- tables ---------- */
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
+th { text-align: left; font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--rain-dim);
+  padding: .3rem .5rem .45rem 0; border-bottom: 1px solid var(--line); }
+td { padding: .45rem .5rem .45rem 0; border-bottom: 1px solid var(--line);
+  font-family: "Spline Sans Mono", monospace; color: var(--rain); vertical-align: top; }
+td.k { color: var(--moon); word-break: break-all; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: color-mix(in srgb, var(--panel-2) 60%, transparent); }
+.nowrap { white-space: nowrap; }
+/* ---------- icons + tones ---------- */
+.i { width: 1.05em; height: 1.05em; flex: none; vertical-align: -.15em;
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.i.big { width: 1.3em; height: 1.3em; }
+/* One hue carries one meaning everywhere: chips, health rows, log lines, tiles. */
+.t-amber  { --tone: var(--lamp); }
+.t-green  { --tone: var(--ok); }
+.t-red    { --tone: var(--alert); }
+.t-violet { --tone: var(--violet); }
+.t-cyan   { --tone: var(--cyan); }
+.t-grey   { --tone: var(--grey); }
+.toned { color: var(--tone, var(--rain)); }
+
+.status { display: inline-flex; align-items: center; gap: .3em;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); letter-spacing: .04em;
+  padding: .12rem .45rem; border-radius: 999px; white-space: nowrap;
+  color: var(--tone, var(--rain));
+  border: 1px solid color-mix(in srgb, var(--tone, var(--rain)) 45%, transparent);
+  background: color-mix(in srgb, var(--tone, var(--rain)) 12%, transparent); }
+
+/* the platform an account posts to, as a colour down its left edge */
+[data-platform] { --platform: var(--rain-dim); }
+[data-platform="tiktok"] { --platform: var(--tt); }
+[data-platform="instagram"] { --platform: var(--ig); }
+.platform-mark { color: var(--platform); }
+
+/* ---------- controls ---------- */
+button {
+  display: inline-flex; align-items: center; gap: .4em;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); letter-spacing: .05em;
+  background: none; color: var(--rain); border: 1px solid var(--line-2); border-radius: 4px;
+  padding: .25rem .55rem; cursor: pointer; white-space: nowrap;
+}
+button:hover:not(:disabled) { color: var(--moon); border-color: var(--rain); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button.primary { color: var(--lamp); border-color: color-mix(in srgb, var(--lamp) 55%, transparent); }
+button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--lamp) 14%, transparent); color: var(--lamp); }
+button.danger { color: var(--alert); border-color: color-mix(in srgb, var(--alert) 55%, transparent); }
+button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--alert) 14%, transparent); color: var(--alert); }
+button.chip { color: var(--tone, var(--rain)); border-color: color-mix(in srgb, var(--tone, var(--rain)) 40%, transparent); }
+button.chip[aria-pressed="true"] { color: var(--ink); background: var(--tone, var(--rain)); border-color: var(--tone, var(--rain)); }
+input, textarea, select {
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body);
+  background: var(--panel-2); color: var(--moon); border: 1px solid var(--line-2);
+  border-radius: 4px; padding: .35rem .5rem; width: 100%;
+}
+textarea { line-height: 1.55; resize: vertical; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
+.row { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.grid-form { display: grid; gap: .45rem; margin-top: .6rem; }
+
+.health-row { display: flex; justify-content: space-between; gap: 1rem; padding: .38rem 0;
+  border-bottom: 1px solid var(--line); font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); }
+.health-row:last-child { border-bottom: none; }
+.health-row .k { display: flex; align-items: center; gap: .55em; }
+.health-row .k .i { color: var(--tone, var(--rain-dim)); }
+.health-row .v { color: var(--tone, var(--rain)); text-align: right; white-space: nowrap; }
+.empty-note { color: var(--rain-dim); font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); }
+.log { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); color: var(--rain);
+  max-height: 340px; overflow-y: auto; line-height: 1.65; }
+.log > div { display: flex; align-items: baseline; gap: .5rem; padding: .05rem 0; }
+.log .i { color: var(--tone, var(--rain-dim)); align-self: center; }
+.log time { color: var(--rain-dim); flex: none; }
+.log .what { color: var(--tone, var(--rain)); }
+.log .detail { color: var(--rain-dim); word-break: break-word; }
+
+/* ---------- agent cards ---------- */
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.agent { background: var(--panel-2); padding: .9rem 1rem 1rem; display: grid; gap: .55rem; align-content: start;
+  border-left: 3px solid var(--platform); }
+.agent .top { display: flex; align-items: center; gap: .5rem; }
+.agent .top b { font-size: var(--fs-lead); }
+.agent .who { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); color: var(--rain-dim); }
+.agent .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: .35rem .45rem; }
+.fact .k { display: flex; align-items: center; gap: .4em;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--rain-dim); }
+.fact .v { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); margin-top: .1rem;
+  color: var(--tone, var(--moon)); }
+.banner { display: flex; align-items: flex-start; gap: .55rem;
+  border: 1px solid color-mix(in srgb, var(--tone, var(--alert)) 55%, transparent);
+  background: color-mix(in srgb, var(--tone, var(--alert)) 10%, transparent);
+  color: var(--tone, var(--alert)); border-radius: 6px;
+  padding: .5rem .7rem; font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); margin-bottom: .9rem; }
+.banner .i { margin-top: .15em; }
+
+/* ---------- console drawer ---------- */
+#console {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  background: var(--panel-2); border-top: 1px solid var(--line-2);
+  display: grid; grid-template-rows: auto 1fr;
+}
+#console .bar { display: flex; align-items: center; gap: .6rem; padding: .45rem .9rem;
+  border-bottom: 1px solid var(--line); font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); }
+#console .bar .who { color: var(--moon); }
+#console .bar .meta { color: var(--rain-dim); }
+#console .bar .actions { margin-left: auto; display: flex; gap: .35rem; }
+#console pre { margin: 0; padding: .6rem .9rem 1rem; overflow: auto; height: 240px;
+  font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); line-height: 1.6; color: var(--rain);
+  white-space: pre-wrap; word-break: break-word; }
+#console.collapsed pre { display: none; }
+.spin { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); }
+@media (prefers-reduced-motion: no-preference) { .spin { animation: breathe 1.1s ease-in-out infinite; } }
+
+/* ---------- modal + toasts ---------- */
+dialog { border: 1px solid var(--line-2); background: var(--panel); color: var(--moon);
+  border-radius: 10px; padding: 0; width: min(680px, 92vw); margin: auto; }
+dialog h2 { font-family: "Spline Sans Mono", monospace; font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--rain-dim); margin-bottom: .5rem; }
+dialog::backdrop { background: rgba(4, 8, 16, .7); }
+dialog .head { padding: .9rem 1.1rem; border-bottom: 1px solid var(--line); display: flex; gap: .8rem; align-items: center; }
+dialog .head h3 { font-size: var(--fs-lead); font-variation-settings: "wght" 700; word-break: break-all; }
+dialog .body { padding: 1rem 1.1rem; max-height: 62vh; overflow: auto; }
+dialog .foot { padding: .7rem 1.1rem; border-top: 1px solid var(--line); display: flex; gap: .4rem; justify-content: flex-end; }
+#toasts { position: fixed; right: 1rem; bottom: calc(var(--console-h) + 1rem); z-index: 60;
+  display: grid; gap: .4rem; justify-items: end; }
+.toast { display: flex; align-items: center; gap: .5rem;
+  background: var(--panel); border: 1px solid var(--line-2); border-left: 3px solid var(--tone, var(--rain));
+  border-radius: 6px; padding: .5rem .8rem; font-family: "Spline Sans Mono", monospace; font-size: var(--fs-body); }
+.toast .i { color: var(--tone, var(--rain)); }
+
+@media (max-width: 1100px) { .rail-days { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px) {
+  .cols { grid-template-columns: 1fr; }
+  main { padding: 1rem; }
+  .rail-days { grid-template-columns: 1fr; }
+  header, nav.tabs { padding-left: 1rem; padding-right: 1rem; }
+  nav.tabs { top: 88px; }
+}
+</style>
+</head>
+<body>
+<!-- Icon sheet. Inline so the desk keeps working with no network at 2am. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <symbol id="i-desk" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
+    <symbol id="i-agents" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M9.5 17.5h5"/></symbol>
+    <symbol id="i-pipeline" viewBox="0 0 24 24"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="18" r="2"/></symbol>
+    <symbol id="i-content" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-system" viewBox="0 0 24 24"><path d="M5 21V14M5 10V3M12 21v-9M12 8V3M19 21v-5M19 12V3M2 14h6M9 8h6M16 16h6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4M15 12v3"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.5 7a8 8 0 1011 0"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 13l5 5L20 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l9 17H3z"/><path d="M12 9v5M12 17h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 17V4M7 9l5-5 5 5M4 20h16"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 4v16M15 4v16"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2 6M20 5v6h-6"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+    <symbol id="i-tiktok" viewBox="0 0 24 24"><path d="M10 20a3.5 3.5 0 103.5-3.5V4c1 2.5 2.5 3.6 5 3.8"/></symbol>
+    <symbol id="i-instagram" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17 7h.01"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></symbol>
+    <symbol id="i-gap" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" stroke-dasharray="3 3"/><path d="M9 13h6"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M17 5.2a3.5 3.5 0 010 5.6M18 14.5a6 6 0 013.5 5.5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3M9 3h6M7.5 15h9"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h4"/></symbol>
+  </defs>
+</svg>
+<header>
+  <h1>Auto<span>·</span>Bot</h1>
+  <div class="lamp" id="lamp"><span class="lamp-dot"></span><span id="lamp-text">…</span></div>
+  <div class="head-actions">
+    <span class="tick-note" id="refreshed">—</span>
+    <button data-act="run" data-task="tick" class="primary"><svg class="i "><use href="#i-play"/></svg>Run tick</button>
+    <button data-act="run" data-task="agents"><svg class="i "><use href="#i-spark"/></svg>Run agents</button>
+    <button data-act="run" data-task="authcheck" data-account="all"><svg class="i "><use href="#i-key"/></svg>Check logins</button>
+    <button data-act="stop" id="stop-btn" class="danger"><svg class="i "><use href="#i-power"/></svg><span id="stop-label">Kill switch</span></button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist">
+  <button role="tab" data-tab="desk" aria-selected="true"><svg class="i "><use href="#i-desk"/></svg>Desk</button>
+  <button role="tab" data-tab="agents" aria-selected="false"><svg class="i "><use href="#i-agents"/></svg>Agents</button>
+  <button role="tab" data-tab="pipeline" aria-selected="false"><svg class="i "><use href="#i-pipeline"/></svg>Pipeline<span class="count" id="tab-attention"></span></button>
+  <button role="tab" data-tab="content" aria-selected="false"><svg class="i "><use href="#i-content"/></svg>Content</button>
+  <button role="tab" data-tab="system" aria-selected="false"><svg class="i "><use href="#i-system"/></svg>System<span class="count" id="tab-config"></span></button>
+</nav>
+
+<main>
+  <!-- ============================ DESK ============================ -->
+  <div data-panel="desk">
+    <div class="tiles" id="tiles" style="margin-bottom:1.2rem"></div>
+    <section>
+      <h2><svg class="i "><use href="#i-calendar"/></svg>Schedule — the next five days<span class="right"><span class="empty-note" id="rail-note"></span></span></h2>
+      <div class="rail" id="rail"></div>
+    </section>
+    <div class="cols" style="margin-top:1.2rem">
+      <section class="card">
+        <h2><svg class="i "><use href="#i-inbox"/></svg>Needs you</h2>
+        <table id="attention"><thead><tr><th>Job</th><th>Status</th><th>Why</th><th></th></tr></thead><tbody></tbody></table>
+        <p class="empty-note" id="attention-empty" hidden>Nothing is waiting on a human. The desk is clear.</p>
+      </section>
+      <section class="card">
+        <h2><svg class="i "><use href="#i-check"/></svg>Desk health</h2>
+        <div id="health"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================ AGENTS ============================ -->
+  <div data-panel="agents" hidden>
+    <div id="agent-banner"></div>
+    <section>
+      <h2><svg class="i "><use href="#i-agents"/></svg>Content agents
+        <span class="right">
+          <span class="empty-note" id="agent-model"></span>
+          <button data-act="run" data-task="agents" class="primary"><svg class="i "><use href="#i-spark"/></svg>Run every account</button>
+        </span>
+      </h2>
+      <div class="agent-grid" id="agents"></div>
+    </section>
+    <div class="cols" style="margin-top:1.2rem">
+      <section class="card">
+        <h2><svg class="i "><use href="#i-note"/></svg>Agent brief — agents/account.md
+          <span class="right">
+            <span class="empty-note" id="tpl-count"></span>
+            <button data-act="tpl-revert"><svg class="i "><use href="#i-refresh"/></svg>Revert</button>
+            <button data-act="tpl-save" class="primary"><svg class="i "><use href="#i-check"/></svg>Save brief</button>
+          </span>
+        </h2>
+        <textarea id="tpl" rows="22" spellcheck="false"></textarea>
+        <p class="empty-note" style="margin-top:.5rem">Every account's run is this file with its ACCOUNT/PROJECT/SLOTS header prepended. The previous version is kept as account.md.bak.</p>
+      </section>
+      <section class="card">
+        <h2><svg class="i "><use href="#i-terminal"/></svg>Agent runs</h2>
+        <table id="agent-history"><thead><tr><th>When</th><th>Account</th><th>Model</th><th>Result</th></tr></thead><tbody></tbody></table>
+        <p class="empty-note" id="agent-history-empty" hidden>No agent has run yet.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================ PIPELINE ============================ -->
+  <div data-panel="pipeline" hidden>
+    <section class="card tight">
+      <div class="row">
+        <input id="job-search" placeholder="filter by key or error…" style="max-width:280px">
+        <span id="job-chips" class="row"></span>
+        <span class="empty-note" id="job-count" style="margin-left:auto"></span>
+      </div>
+    </section>
+    <section class="card">
+      <h2><svg class="i "><use href="#i-pipeline"/></svg>Jobs</h2>
+      <table id="jobs"><thead><tr>
+        <th>Job</th><th>Status</th><th>Goes out</th><th>Tries</th><th>Last touched</th><th></th>
+      </tr></thead><tbody></tbody></table>
+      <p class="empty-note" id="jobs-empty" hidden>No job matches. The strategist plans one, the factory renders it, the publisher airs it.</p>
+    </section>
+  </div>
+
+  <!-- ============================ CONTENT ============================ -->
+  <div data-panel="content" hidden>
+    <div class="cols">
+      <div>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-content"/></svg>Aired — how it performed</h2>
+          <table id="perf"><thead><tr>
+            <th>Post</th><th>Account</th><th>Views</th><th>Likes</th><th>Comments</th><th>Shares</th><th></th>
+          </tr></thead><tbody></tbody></table>
+          <p class="empty-note" id="perf-empty" hidden>Nothing has aired yet.</p>
+        </section>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-file"/></svg>Plans</h2>
+          <table id="plans"><thead><tr><th>Key</th><th>Angle</th><th>Hook</th><th>Made</th></tr></thead><tbody></tbody></table>
+          <p class="empty-note" id="plans-empty" hidden>No plans yet — run the strategist from an agent card.</p>
+        </section>
+      </div>
+      <div>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-flask"/></svg>Experiment</h2>
+          <div id="experiment"></div>
+          <div class="grid-form" id="exp-form" hidden>
+            <input id="exp-name" placeholder="Name, e.g. hook_style_001">
+            <input id="exp-hyp" placeholder="Hypothesis">
+            <input id="exp-control" placeholder="Control, e.g. feature-first hook">
+            <input id="exp-variant" placeholder="Variant, e.g. pain-first hook">
+            <div class="row"><button data-act="exp-create" class="primary"><svg class="i "><use href="#i-play"/></svg>Start experiment</button>
+              <button data-act="exp-cancel">Cancel</button></div>
+          </div>
+          <button data-act="exp-new" id="exp-new"><svg class="i "><use href="#i-flask"/></svg>New experiment</button>
+        </section>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-archive"/></svg>Past experiments</h2>
+          <div id="exp-past"></div>
+        </section>
+      </div>
+    </div>
+    <section class="card">
+      <h2><svg class="i "><use href="#i-layers"/></svg>Library<span class="tick-note" id="lib-note"></span>
+        <button data-act="lib-filter" id="lib-filter" style="margin-left:auto"></button></h2>
+      <div class="thumbs" id="library"></div>
+      <p class="empty-note" id="library-empty" hidden>Nothing catalogued yet — run <span class="m">npm run library -- --import</span>.</p>
+    </section>
+  </div>
+
+  <!-- ============================ SYSTEM ============================ -->
+  <div data-panel="system" hidden>
+    <div id="config-banner"></div>
+    <div class="cols">
+      <div>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-users"/></svg>Registry<span class="right"><button data-act="run" data-task="registry"><svg class="i "><use href="#i-check"/></svg>Lint</button></span></h2>
+          <table id="registry"><thead><tr>
+            <th>Account</th><th>Platform</th><th>Slots</th><th>Mode</th><th>Login</th><th></th>
+          </tr></thead><tbody></tbody></table>
+        </section>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-note"/></svg>Event log<span class="right"><input id="log-filter" placeholder="filter…" style="max-width:160px"></span></h2>
+          <div class="log" id="log"></div>
+        </section>
+      </div>
+      <div>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-system"/></svg>Maintenance</h2>
+          <div class="row" style="margin-bottom:.6rem">
+            <button data-act="run" data-task="metrics"><svg class="i "><use href="#i-content"/></svg>Metrics sweep</button>
+            <button data-act="run" data-task="export"><svg class="i "><use href="#i-upload"/></svg>Export performance</button>
+            <button data-act="run" data-task="tick"><svg class="i "><use href="#i-play"/></svg>Publish tick</button>
+          </div>
+          <div id="system-health"></div>
+        </section>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-terminal"/></svg>Desk runs</h2>
+          <table id="runs"><thead><tr><th>Task</th><th>Started</th><th>Result</th><th></th></tr></thead><tbody></tbody></table>
+          <p class="empty-note" id="runs-empty" hidden>Nothing has been run from the desk this session.</p>
+        </section>
+        <section class="card">
+          <h2><svg class="i "><use href="#i-layers"/></svg>Queue directories</h2>
+          <div id="queue-list" class="log"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="console" class="collapsed" hidden>
+  <div class="bar">
+    <span id="run-dot"></span>
+    <span class="who" id="run-who">—</span>
+    <span class="meta" id="run-meta"></span>
+    <span class="actions">
+      <button data-act="run-cancel" id="run-cancel" hidden class="danger"><svg class="i "><use href="#i-x"/></svg>Cancel</button>
+      <button data-act="console-toggle" id="console-toggle"><svg class="i "><use href="#i-terminal"/></svg><span id="console-toggle-label">Show output</span></button>
+      <button data-act="console-hide">Hide</button>
+    </span>
+  </div>
+  <pre id="run-output"></pre>
+</div>
+
+<dialog id="modal">
+  <div class="head"><h3 id="modal-title">—</h3></div>
+  <div class="body" id="modal-body"></div>
+  <div class="foot" id="modal-foot"></div>
+</dialog>
+
+<div id="toasts"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = (n) => (n ?? 0).toLocaleString();
+const short = (t) => (t ? String(t).replace("T", " ").slice(5, 16) : "—");
+const icon = (name, cls = "") => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
+// SQLite stamps "YYYY-MM-DD HH:MM:SS" in UTC with no marker, and Chrome would
+// read that as local time — every age on the desk would be hours out.
+const asDate = (t) => {
+  if (!t) return null;
+  const iso = String(t).replace(" ", "T");
+  const d = new Date(/[Z]$|[+]\d\d:\d\d$/.test(iso) ? iso : iso + "Z");
+  return isNaN(d) ? null : d;
+};
+const ago = (t) => {
+  const d = asDate(t);
+  if (!d) return "never";
+  const mins = Math.round((Date.now() - d) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)} h ago`;
+  const days = Math.round(mins / 1440);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+};
+const when = (t) => (asDate(t) ? asDate(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+// One row of truth for what a job status means, how it is spelled for a human,
+// and which hue and glyph carry it everywhere on the desk.
+const STATUS = {
+  PLANNED:               { label: "Queued",          ic: "clock",    tone: "cyan"   },
+  UPLOADING:             { label: "Uploading",       ic: "upload",   tone: "violet" },
+  AWAITING_FINAL_ACTION: { label: "Finishing",       ic: "upload",   tone: "violet" },
+  SCHEDULED:             { label: "Scheduled",       ic: "calendar", tone: "amber"  },
+  PUBLISHED:             { label: "Published",       ic: "check",    tone: "green"  },
+  FAILED:                { label: "Failed",          ic: "x",        tone: "red"    },
+  MANUAL_REVIEW:         { label: "Needs review",    ic: "eye",      tone: "red"    },
+  UNKNOWN:               { label: "Outcome unknown", ic: "help",     tone: "red"    },
+  ARCHIVED:              { label: "Archived",        ic: "archive",  tone: "grey"   },
+};
+const statusOf = (st) => STATUS[st] ?? { label: String(st ?? "—").replaceAll("_", " "), ic: "note", tone: "grey" };
+const chip = (st) => {
+  const m = statusOf(st);
+  return `<span class="status t-${m.tone}">${icon(m.ic)}${m.label}</span>`;
+};
+const platformIcon = (p) => (p === "instagram" ? "instagram" : p === "tiktok" ? "tiktok" : "users");
+
+const EVENT_LOOK = [
+  [/error|fail|unknown|missing|died|quota|dead/i, "red", "alert"],
+  [/manual_resolve|paused|kill_switch|review/i, "amber", "eye"],
+  [/agent/i, "violet", "spark"],
+  [/desk_run/i, "cyan", "terminal"],
+  [/metrics|verified|published|scheduled|archived|ok/i, "green", "check"],
+];
+const eventLook = (e) => {
+  const text = `${e.event} ${e.detail ?? ""}`;
+  for (const [re, tone, ic] of EVENT_LOOK) if (re.test(text)) return { tone, ic };
+  return { tone: "grey", ic: "note" };
+};
+
+const ui = {
+  tab: localStorage.getItem("desk.tab") || "desk",
+  libUnused: false,
+  statuses: new Set(),
+  search: "",
+  logFilter: "",
+  runId: null,
+  runFrom: 0,
+  consoleOpen: false,
+  tplDirty: false,
+};
+let state = null;
+
+/* ------------------------------------------------------------------ toasts */
+function toast(msg, kind = "") {
+  const el = document.createElement("div");
+  const tone = kind === "bad" ? "red" : kind === "good" ? "green" : "cyan";
+  el.className = `toast t-${tone}`;
+  el.innerHTML = icon(kind === "bad" ? "alert" : kind === "good" ? "check" : "note") + "<span></span>";
+  el.lastChild.textContent = msg;
+  $("toasts").append(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+/* ------------------------------------------------------------------ modal */
+function modal({ title, body, actions = [] }) {
+  $("modal-title").textContent = title;
+  $("modal-body").innerHTML = body;
+  $("modal-foot").innerHTML = "";
+  for (const a of actions) {
+    const b = document.createElement("button");
+    b.textContent = a.label;
+    if (a.kind) b.className = a.kind;
+    b.onclick = () => { const keep = a.run?.(); if (!keep) $("modal").close(); };
+    $("modal-foot").append(b);
+  }
+  const close = document.createElement("button");
+  close.textContent = "Close";
+  close.onclick = () => $("modal").close();
+  $("modal-foot").append(close);
+  $("modal").showModal();
+}
+const confirmDo = (title, question, label, run, kind = "danger") =>
+  modal({ title, body: `<p class="empty-note">${esc(question)}</p>`, actions: [{ label, kind, run }] });
+
+/* ------------------------------------------------------------------ api */
+async function api(url, body) {
+  const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { toast(data.error || `${res.status} ${url}`, "bad"); throw new Error(data.error || res.status); }
+  return data;
+}
+
+/* ------------------------------------------------------------------ runs */
+async function startTask(task, account) {
+  const run = await api("/api/run", { task, account });
+  ui.runId = run.id; ui.runFrom = 0; ui.consoleOpen = true;
+  $("console").hidden = false; $("console").classList.remove("collapsed");
+  $("console-toggle-label").textContent = "Hide output";
+  $("run-output").textContent = "";
+  sizeConsole();
+  toast(`${run.label} started`, "good");
+  pollRun();
+}
+
+async function pollRun() {
+  if (!ui.runId) return;
+  const r = await fetch(`/api/run?id=${ui.runId}&from=${ui.runFrom}`).then((x) => x.json()).catch(() => null);
+  if (!r || !r.id) return;
+  if (r.lines.length) {
+    const pre = $("run-output");
+    const stick = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 24;
+    pre.textContent += r.lines.join("\n") + "\n";
+    ui.runFrom = r.total;
+    if (stick) pre.scrollTop = pre.scrollHeight;
+  }
+  const running = !r.ended;
+  $("run-who").textContent = r.label + (r.account ? ` · ${r.account}` : "");
+  $("run-meta").textContent = running
+    ? `running · started ${ago(r.started)}`
+    : `${r.exit === 0 ? "finished" : "failed"} ${ago(r.ended)}${r.exit === 0 ? "" : ` · exit ${r.exit}`}`;
+  $("run-dot").className = running ? "spin" : "";
+  $("run-cancel").hidden = !running;
+  // Only announce a finish this tab actually watched happen — otherwise every
+  // page load toasts (and re-refreshes for) whatever ran hours ago.
+  if (running) { ui.runWatched = true; setTimeout(pollRun, 1200); }
+  else if (ui.runWatched) { ui.runWatched = false; toast(`${r.label} exited ${r.exit}`, r.exit === 0 ? "good" : "bad"); refresh(); }
+}
+
+/* ------------------------------------------------------------------ render */
+function setTab(tab) {
+  ui.tab = tab;
+  localStorage.setItem("desk.tab", tab);
+  for (const b of $("tabs").children) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+  for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== tab;
+  if (state) render();
+}
+
+async function refresh() {
+  const active = document.activeElement;
+  if (active && ["INPUT", "TEXTAREA"].includes(active.tagName) && active.id !== "job-search" && active.id !== "log-filter") return;
+  try { state = await api("/api/state"); } catch { return; }
+  window.__state = state;
+  $("refreshed").textContent = `synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  if (!ui.runId && state.run) { ui.runId = state.run.id; ui.runFrom = 0; $("console").hidden = false; sizeConsole(); pollRun(); }
+  render();
+}
+
+function render() {
+  const s = state;
+  const h = s.health;
+  const needsYou = h.unknown_jobs + h.manual_review;
+
+  // lamp + kill switch
+  const lamp = $("lamp");
+  lamp.classList.toggle("off", h.stop_file);
+  lamp.classList.toggle("alert", !h.stop_file && (needsYou > 0 || h.config_errors.length > 0));
+  $("lamp-text").textContent = h.stop_file ? "Stopped"
+    : h.config_errors.length ? "Config broken"
+    : needsYou ? "Needs you" : "On air";
+  $("stop-label").textContent = h.stop_file ? "Clear kill switch" : "Kill switch";
+  $("stop-btn").classList.toggle("danger", !h.stop_file);
+  $("stop-btn").classList.toggle("primary", h.stop_file);
+  $("tab-attention").textContent = needsYou ? `· ${needsYou}` : "";
+  $("tab-config").textContent = h.config_errors.length ? `· ${h.config_errors.length}` : "";
+
+  const live = s.accounts.filter((a) => a.enabled && a.auto && !a.paused && a.ok !== 0 && !a.config_error);
+  const enabled = s.accounts.filter((a) => a.enabled);
+
+  if (ui.tab === "desk") renderDesk(s, h, needsYou, live, enabled);
+  if (ui.tab === "agents") renderAgents(s);
+  if (ui.tab === "pipeline") renderPipeline(s);
+  if (ui.tab === "content") renderContent(s);
+  if (ui.tab === "system") renderSystem(s, h, live, enabled);
+}
+
+/* ---------------- desk ---------------- */
+function renderDesk(s, h, needsYou, live, enabled) {
+  const postedToday = enabled.reduce((n, a) => n + a.posted_today, 0);
+  const capToday = enabled.reduce((n, a) => n + a.cap, 0);
+  const gaps = enabled.reduce((n, a) => n + a.days.filter((d) => d.state === "empty").length, 0);
+  $("tiles").innerHTML = [
+    { k: "Needs you", ic: "inbox", v: needsYou, tone: needsYou ? "red" : "green" },
+    { k: "Posted today", ic: "check", v: `${postedToday}<small>/${capToday}</small>`, tone: postedToday ? "green" : "grey" },
+    { k: "Ready to go out", ic: "layers", v: h.queue_depth, tone: h.queue_depth ? "cyan" : "red" },
+    { k: "Days with nothing", ic: "gap", v: gaps, tone: gaps ? "amber" : "green" },
+    { k: "Accounts live", ic: "users", v: `${live.length}<small>/${enabled.length}</small>`, tone: live.length ? "green" : "red" },
+  ].map((t) => `<div class="tile t-${t.tone}"><div class="k">${icon(t.ic)}${t.k}</div><div class="v">${t.v}</div></div>`).join("");
+
+  const names = ["Today", "Tomorrow", "+2", "+3", "+4"];
+  $("rail-note").textContent = `${enabled.length} enabled account(s)`;
+  $("rail").innerHTML = enabled.map((a) => `
+    <div class="account-rail" data-platform="${esc(a.platform)}">
+      ${accountHead(a)}
+      ${a.note ? `<div class="account-note">${esc(a.note)}</div>` : ""}
+      <div class="rail-days">
+        ${a.days.map((d, i) => {
+          const look = {
+            scheduled: { ic: "calendar", tone: "amber", sub: `${d.scheduled} scheduled` },
+            attention: { ic: "alert", tone: "red", sub: `${d.attention} waiting on you` },
+            queued: { ic: "clock", tone: "cyan", sub: `${d.planned} waiting its turn` },
+            empty: { ic: "gap", tone: "red", sub: "nothing queued for this day" },
+          }[d.state];
+          return `
+          <div class="slot ${d.state} t-${look.tone}">
+            <div class="when">${names[i]} · ${d.date.slice(5)}</div>
+            <div class="title">${icon(look.ic)}${d.state === "empty" ? "nothing" : esc(d.job)}</div>
+            <div class="sub">${look.sub}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`).join("") || `<div class="slot"><div class="title">No enabled accounts</div><div class="sub">declare one in apps/&lt;project&gt;/profile.json</div></div>`;
+
+  const attention = s.jobs.filter((j) => ["MANUAL_REVIEW", "UNKNOWN", "FAILED"].includes(j.status));
+  $("attention").tBodies[0].innerHTML = attention.map((j) => `
+    <tr>
+      <td class="k">${esc(j.key)}</td>
+      <td>${chip(j.status)}</td>
+      <td>${esc(j.error ?? "—")}</td>
+      <td class="nowrap">${jobActions(j)}</td>
+    </tr>`).join("");
+  $("attention-empty").hidden = attention.length > 0;
+
+  $("health").innerHTML = `
+    ${healthRow("Kill switch", h.stop_file ? "engaged — nothing runs" : "clear", h.stop_file ? "red" : "green", "power")}
+    ${healthRow("Config errors", h.config_errors.length, h.config_errors.length ? "red" : "green", "alert")}
+    ${healthRow("Outcome unknown", h.unknown_jobs, h.unknown_jobs ? "red" : "green", "help")}
+    ${healthRow("Waiting on review", h.manual_review, h.manual_review ? "red" : "green", "eye")}
+    ${healthRow("Failed", h.failed, h.failed ? "red" : "green", "x")}
+    ${healthRow("Jobs with no account", h.unregistered, h.unregistered ? "red" : "green", "help")}
+    ${healthRow("Folders with no job row", h.orphan_queue, h.orphan_queue ? "red" : "green", "layers")}
+    ${healthRow("Last activity", ago(h.last_event), "", "clock")}`;
+}
+const healthRow = (k, v, tone = "", ic = "") =>
+  `<div class="health-row ${tone ? "t-" + tone : ""}"><span class="k">${ic ? icon(ic) : ""}${k}</span><span class="v">${esc(v)}</span></div>`;
+
+function accountHead(a) {
+  return `<div class="account-head">
+    <span class="platform-mark" title="${esc(a.platform)}">${icon(platformIcon(a.platform), "big")}</span>
+    <b>${esc(a.id)}</b>
+    ${accountTags(a)}
+    <button data-act="run" data-task="agents" data-account="${esc(a.id)}">${icon("spark")}Run agent</button>
+    <button data-act="pause" data-account="${esc(a.id)}" data-paused="${a.paused ? 1 : 0}">${icon(a.paused ? "play" : "pause")}${a.paused ? "Resume" : "Pause"}</button>
+  </div>`;
+}
+
+function accountTags(a) {
+  return `<span class="tags">
+    ${a.paused ? `<span class="tag bad">${icon("pause")}paused by you</span>` : ""}
+    ${a.ok === 0 ? `<span class="tag bad">${icon("key")}login dead</span>` : ""}
+    ${a.config_error ? `<span class="tag bad">${icon("alert")}config error</span>` : ""}
+    ${a.auto ? `<span class="tag good">${icon("spark")}posts by itself</span>` : `<span class="tag">${icon("eye")}needs you at the desk</span>`}
+    ${a.can_schedule ? "" : `<span class="tag amber">${icon("play")}posts immediately</span>`}
+    <span class="tag">${icon("check")}${a.posted_today}/${a.cap} today</span>
+    <span class="tag">${icon("layers")}${a.queue_days} days queued</span>
+  </span>`;
+}
+
+/* ---------------- agents ---------------- */
+function renderAgents(s) {
+  const ag = s.agents;
+  $("agent-model").textContent = `model: ${ag.model}`;
+  $("agent-banner").innerHTML = ag.quota_hit
+    ? `<div class="banner t-red">${icon("alert")}<span>The claude CLI hit its usage limit on a recent run — remaining accounts were skipped. Set CLAUDE_MODEL and restart the desk, or wait for the window to clear.</span></div>` : "";
+
+  $("agents").innerHTML = ag.accounts.map((a) => {
+    const last = a.agent_last;
+    const rcTone = !last ? "grey" : last.rc === 0 ? "green" : "red";
+    const state = a.agent_blocked ? { ic: "pause", tone: "red" } : a.enabled ? { ic: "spark", tone: "green" } : { ic: "archive", tone: "grey" };
+    return `<div class="agent" data-platform="${esc(a.platform)}">
+      <div class="top">
+        <span class="toned t-${state.tone}">${icon(state.ic, "big")}</span>
+        <b>${esc(a.id)}</b>
+        <span class="who platform-mark">${icon(platformIcon(a.platform))} ${esc(a.project)}${a.handle ? " · @" + esc(a.handle) : ""}</span>
+      </div>
+      ${a.agent_blocked ? `<div class="tag bad" style="justify-self:start">${icon("pause")}no run — ${esc(a.agent_blocked)}</div>` : ""}
+      <div class="facts">
+        <div class="fact"><div class="k">${icon("clock")}Last run</div><div class="v">${last ? ago(last.at) : "never"}</div></div>
+        <div class="fact t-${rcTone}"><div class="k">${icon(rcTone === "green" ? "check" : rcTone === "red" ? "x" : "help")}Result</div>
+          <div class="v">${!last ? "—" : Number.isNaN(last.rc) ? "?" : last.rc === 0 ? "ok" : "failed"}</div></div>
+        <div class="fact t-${a.queued_today ? "green" : "grey"}"><div class="k">${icon("layers")}Queued today</div><div class="v">${a.queued_today}</div></div>
+        <div class="fact"><div class="k">${icon("file")}Planned today</div><div class="v">${a.planned_today}</div></div>
+        <div class="fact"><div class="k">${icon("calendar")}Backlog</div><div class="v">${a.queue_days} days</div></div>
+        <div class="fact t-${a.ok === 0 ? "red" : a.ok === 1 ? "green" : "grey"}"><div class="k">${icon("key")}Login</div>
+          <div class="v">${a.ok === 0 ? "dead" : a.ok === 1 ? "ok" : "unchecked"}</div></div>
+      </div>
+      <div class="row">
+        <button data-act="run" data-task="agents" data-account="${esc(a.id)}" class="primary">${icon("spark")}Run agent</button>
+        <button data-act="run" data-task="plan" data-account="${esc(a.id)}">${icon("file")}Plan only</button>
+        <button data-act="run" data-task="authcheck" data-account="${esc(a.id)}">${icon("key")}Check login</button>
+        <button data-act="pause" data-account="${esc(a.id)}" data-paused="${a.paused ? 1 : 0}">${icon(a.paused ? "play" : "pause")}${a.paused ? "Resume" : "Pause"}</button>
+      </div>
+      ${a.note ? `<div class="empty-note" style="color:var(--alert)">${esc(a.note)}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  if (!ui.tplDirty && $("tpl").value !== ag.template) $("tpl").value = ag.template;
+  $("tpl-count").textContent = `${$("tpl").value.length} chars${ui.tplDirty ? " · unsaved" : ""}`;
+
+  $("agent-history").tBodies[0].innerHTML = ag.history.filter((r) => r.account).map((r) => `
+    <tr>
+      <td class="nowrap">${ago(r.at)}</td>
+      <td class="k">${esc(r.account)}</td>
+      <td>${esc(r.model ?? "—")}${r.quota ? ` <span class="tag bad">${icon("alert")}quota</span>` : ""}</td>
+      <td class="nowrap">${r.rc === 0
+        ? `<span class="status t-green">${icon("check")}ok</span>`
+        : `<span class="status t-red">${icon("x")}exit ${Number.isNaN(r.rc) ? "?" : r.rc}</span>`}</td>
+    </tr>`).join("");
+  $("agent-history-empty").hidden = ag.history.some((r) => r.account);
+}
+
+/* ---------------- pipeline ---------------- */
+function renderPipeline(s) {
+  const all = Object.keys(s.counts).sort();
+  $("job-chips").innerHTML = all.map((st) => {
+    const m = statusOf(st);
+    return `<button class="chip t-${m.tone}" data-act="chip" data-status="${st}" aria-pressed="${ui.statuses.has(st)}">${icon(m.ic)}${m.label} ${s.counts[st]}</button>`;
+  }).join("");
+
+  const q = ui.search.toLowerCase();
+  const rows = s.jobs.filter((j) =>
+    (!ui.statuses.size || ui.statuses.has(j.status)) &&
+    (!q || j.key.toLowerCase().includes(q) || (j.error ?? "").toLowerCase().includes(q)));
+  $("job-count").textContent = `${rows.length} of ${s.jobs.length} recent`;
+  $("jobs").tBodies[0].innerHTML = rows.map((j) => `
+    <tr>
+      <td class="k">${esc(j.key)}${j.error ? `<br><span style="color:var(--alert);font-size: var(--fs-micro)">${esc(j.error)}</span>` : ""}</td>
+      <td>${chip(j.status)}</td>
+      <td class="nowrap">${j.scheduled_for ? when(j.scheduled_for) : "—"}</td>
+      <td>${j.attempts ?? 0}</td>
+      <td class="nowrap">${ago(j.updated_at)}</td>
+      <td class="nowrap">${jobActions(j)}</td>
+    </tr>`).join("");
+  $("jobs-empty").hidden = rows.length > 0;
+}
+
+function jobActions(j) {
+  const b = [`<button data-act="job-detail" data-key="${esc(j.key)}">${icon("file")}Details</button>`];
+  if (["MANUAL_REVIEW", "UNKNOWN"].includes(j.status)) {
+    b.push(`<button data-act="resolve" data-key="${esc(j.key)}" data-status="SCHEDULED">${icon("calendar")}It went out</button>`);
+    b.push(`<button data-act="resolve" data-key="${esc(j.key)}" data-status="FAILED" class="danger">${icon("x")}It failed</button>`);
+  }
+  if (["FAILED", "MANUAL_REVIEW"].includes(j.status)) {
+    b.push(`<button data-act="resolve" data-key="${esc(j.key)}" data-status="PLANNED">${icon("refresh")}Try again</button>`);
+  }
+  if (!["ARCHIVED"].includes(j.status)) {
+    b.push(`<button data-act="resolve" data-key="${esc(j.key)}" data-status="ARCHIVED">${icon("archive")}Archive</button>`);
+  }
+  return b.join(" ");
+}
+
+async function jobDetail(key) {
+  const d = await api(`/api/job?key=${encodeURIComponent(key)}`);
+  const m = statusOf(d.job.status);
+  modal({
+    title: key,
+    body: `
+      ${healthRow("Status", m.label, m.tone, m.ic)}
+      ${healthRow("Account", d.job.account ?? "—", "", "users")}
+      ${healthRow("Goes out", d.job.scheduled_for ? when(d.job.scheduled_for) : "—", "", "calendar")}
+      ${healthRow("Attempts", d.job.attempts ?? 0, "", "refresh")}
+      ${healthRow("Final click", d.job.clicked_at ? ago(d.job.clicked_at) : "never clicked", "", "play")}
+      ${healthRow("Last touched", ago(d.job.updated_at), "", "clock")}
+      ${d.job.error ? `<p class="empty-note" style="color:var(--alert);margin:.6rem 0">${esc(d.job.error)}</p>` : ""}
+      ${d.plan ? `<h2 style="margin-top:1rem">${icon("file")}Plan</h2>
+        ${healthRow("Angle", d.plan.angle ?? "—", "", "note")}${healthRow("Hook", d.plan.hook ?? "—", "", "spark")}
+        <p class="empty-note" style="margin-top:.4rem">${esc(d.plan.caption ?? "")}</p>` : ""}
+      <h2 style="margin-top:1rem">${icon("layers")}Files</h2>
+      <p class="empty-note">queue/${esc(key)}: ${d.queue_files.length ? esc(d.queue_files.join(", ")) : "missing"}<br>
+      evidence/${esc(key)}: ${d.evidence.length ? esc(d.evidence.join(", ")) : "none"}</p>
+      <h2 style="margin-top:1rem">${icon("clock")}History</h2>
+      <div class="log">${d.events.map((e) => {
+        const look = eventLook(e);
+        return `<div class="t-${look.tone}">${icon(look.ic)}<time>${ago(e.at)}</time><span class="what">${esc(e.event)}</span><span class="detail">${esc(e.detail)}</span></div>`;
+      }).join("") || '<span class="empty-note">no events</span>'}</div>`,
+    actions: [],
+  });
+}
+
+/* ---------------- content ---------------- */
+function renderContent(s) {
+  const metricsBy = Object.fromEntries(s.metrics.map((m) => [m.job_key, m]));
+  const aired = s.jobs.filter((j) => ["SCHEDULED", "PUBLISHED"].includes(j.status));
+  $("perf").tBodies[0].innerHTML = aired.map((j) => {
+    const p = s.plans.find((x) => x.key === j.key);
+    const m = metricsBy[j.key];
+    return `<tr>
+      <td class="k">${esc(p?.hook ?? j.key)}<br><span class="empty-note">${esc(p?.angle ?? j.key)}</span></td>
+      <td class="nowrap platform-mark" data-platform="${esc(s.accounts.find((a) => a.id === j.account)?.platform ?? "")}">${icon(platformIcon(s.accounts.find((a) => a.id === j.account)?.platform))} ${esc(j.account ?? "—")}</td>
+      <td>${m ? num(m.views) : "—"}</td>
+      <td>${m ? num(m.likes) : "—"}</td>
+      <td>${m ? num(m.comments) : "—"}</td>
+      <td>${m ? num(m.shares) : "—"}</td>
+      <td><button data-act="metrics" data-key="${esc(j.key)}">${icon("content")}Log</button></td>
+    </tr>`;
+  }).join("");
+  $("perf-empty").hidden = aired.length > 0;
+
+  $("plans").tBodies[0].innerHTML = s.plans.map((p) => `
+    <tr><td class="k">${esc(p.key)}</td><td>${esc(p.angle ?? "—")}</td>
+      <td>${esc(p.hook ?? "—")}</td><td class="nowrap">${ago(p.created_at)}</td></tr>`).join("");
+  $("plans-empty").hidden = s.plans.length > 0;
+
+  const active = s.experiments.find((e) => e.status === "active");
+  $("experiment").innerHTML = active
+    ? `<div class="health-row t-violet"><span class="k">${icon("flask")}${esc(active.name)}</span>
+         <button data-act="exp-close" data-id="${active.id}">${icon("check")}Close</button></div>
+       <p class="empty-note" style="margin-top:.5rem">${esc(active.hypothesis ?? "")}<br>
+       control: ${esc(active.control ?? "—")} · variant: ${esc(active.variant ?? "—")}</p>`
+    : `<p class="empty-note">No active experiment. The strategist posts without an A/B split.</p>`;
+  $("exp-new").hidden = !!active || !$("exp-form").hidden;
+
+  renderLibrary(s);
+
+  const past = s.experiments.filter((e) => e.status !== "active");
+  $("exp-past").innerHTML = past.map((e) =>
+    healthRow(e.name, e.result ?? "no result recorded", "", "archive")).join("") || '<p class="empty-note">Nothing closed yet.</p>';
+}
+
+// Every finished render we have catalogued, newest first. Unused items are the
+// point of the grid: they are what the next slot can be filled from.
+function renderLibrary(s) {
+  const lib = s.library ?? [];
+  const unused = lib.filter((c) => !c.used).length;
+  const shown = ui.libUnused ? lib.filter((c) => !c.used) : lib;
+
+  $("lib-note").textContent = ` · ${lib.length} item${lib.length === 1 ? "" : "s"}, ${unused} unused`;
+  $("lib-filter").innerHTML = ui.libUnused ? `${icon("layers")}Show all` : `${icon("inbox")}Unused only`;
+  $("lib-filter").hidden = !unused;
+
+  $("library").innerHTML = shown.map((c) => {
+    const accounts = (c.accounts ?? "").split(",").filter(Boolean);
+    const tone = !c.used ? "t-amber" : accounts.length > 1 ? "t-violet" : "";
+    const label = !c.used ? "unused" : accounts.length > 1 ? `${c.used}× · ${accounts.length} accounts` : accounts[0];
+    const cls = !c.used ? "is-unused" : accounts.length > 1 ? "is-reused" : "";
+    const title = [c.sha.slice(0, 12), c.width ? `${c.width}x${c.height}` : null,
+                   `${(c.bytes / 1e6).toFixed(1)}MB`, `catalogued ${c.first_seen}`,
+                   accounts.length ? accounts.join(", ") : "never posted"].filter(Boolean).join(" · ");
+    return `<figure class="thumb ${cls} ${tone}" title="${esc(title)}">
+      ${c.has_thumb ? `<img src="/thumb?sha=${esc(c.sha)}" alt="First frame of ${esc(c.sha.slice(0, 12))}" loading="lazy">`
+                    : `<div class="no-frame">no frame</div>`}
+      ${c.duration ? `<span class="dur">${c.duration.toFixed(0)}s</span>` : ""}
+      <figcaption class="who">${icon(c.used ? "check" : "inbox")}<span>${esc(label)}</span></figcaption>
+    </figure>`;
+  }).join("");
+  // Filtering to "unused" when everything has been used leaves an empty grid;
+  // say so rather than showing a blank card.
+  $("library-empty").innerHTML = lib.length
+    ? `Every catalogued video has been posted. <button data-act="lib-filter">Show all ${lib.length}</button>`
+    : `Nothing catalogued yet — run <span class="m">npm run library -- --import</span>.`;
+  $("library-empty").hidden = shown.length > 0;
+}
+
+/* ---------------- system ---------------- */
+function renderSystem(s, h, live, enabled) {
+  $("config-banner").innerHTML =
+    h.config_errors.map((e) => `<div class="banner t-red">${icon("alert")}<span>${esc(e)}</span></div>`).join("") +
+    h.config_warnings.map((w) => `<div class="banner t-amber">${icon("eye")}<span>${esc(w)}</span></div>`).join("");
+
+  $("registry").tBodies[0].innerHTML = s.accounts.map((a) => {
+    const login = !a.profile_exists ? { label: "no profile", tone: "red", ic: "x" }
+      : a.ok === 0 ? { label: "dead", tone: "red", ic: "x" }
+      : a.ok === 1 ? { label: "ok", tone: "green", ic: "check" }
+      : { label: "unchecked", tone: "grey", ic: "help" };
+    return `
+    <tr data-platform="${esc(a.platform)}">
+      <td class="k">${esc(a.id)}<br><span class="empty-note">${esc(a.project)}${a.enabled ? "" : " · disabled"}</span></td>
+      <td class="nowrap platform-mark">${icon(platformIcon(a.platform))} ${esc(a.platform)}</td>
+      <td>${esc(a.slots.join(", "))}</td>
+      <td class="nowrap">${a.auto
+        ? `<span class="status t-green">${icon("spark")}by itself</span>`
+        : `<span class="status t-grey">${icon("eye")}manual</span>`}${a.can_schedule ? "" : ` <span class="status t-amber">${icon("play")}now</span>`}</td>
+      <td class="nowrap"><span class="status t-${login.tone}">${icon(login.ic)}${login.label}</span></td>
+      <td class="nowrap"><button data-act="run" data-task="authcheck" data-account="${esc(a.id)}">${icon("key")}Check</button>
+        <button data-act="pause" data-account="${esc(a.id)}" data-paused="${a.paused ? 1 : 0}">${icon(a.paused ? "play" : "pause")}${a.paused ? "Resume" : "Pause"}</button></td>
+    </tr>`;
+  }).join("");
+
+  $("system-health").innerHTML = `
+    ${healthRow("Kill switch", h.stop_file ? "engaged" : "clear", h.stop_file ? "red" : "green", "power")}
+    ${healthRow("Projects", s.projects.length, "", "layers")}
+    ${healthRow("Accounts live / enabled", `${live.length} / ${enabled.length}`, "", "users")}
+    ${healthRow("Queue folders", s.queue.length, "", "layers")}
+    ${healthRow("Folders with no job row", h.orphan_queue, h.orphan_queue ? "red" : "green", "help")}
+    ${healthRow("Today", h.today, "", "calendar")}`;
+
+  $("runs").tBodies[0].innerHTML = s.runs.map((r) => `
+    <tr><td class="k">${esc(r.label)}${r.account ? `<br><span class="empty-note">${esc(r.account)}</span>` : ""}</td>
+      <td class="nowrap">${ago(r.started)}</td>
+      <td class="nowrap">${!r.ended ? `<span class="status t-violet">${icon("upload")}running</span>`
+        : r.exit === 0 ? `<span class="status t-green">${icon("check")}ok</span>`
+        : `<span class="status t-red">${icon("x")}exit ${r.exit}</span>`}</td>
+      <td><button data-act="run-open" data-id="${r.id}">${icon("terminal")}Output</button></td></tr>`).join("");
+  $("runs-empty").hidden = s.runs.length > 0;
+
+  const f = ui.logFilter.toLowerCase();
+  $("log").innerHTML = s.events
+    .filter((e) => !f || `${e.job_key} ${e.event} ${e.detail}`.toLowerCase().includes(f))
+    .map((e) => {
+      const look = eventLook(e);
+      return `<div class="t-${look.tone}">${icon(look.ic)}<time>${ago(e.at)}</time><span class="what">${esc(e.event)}</span><span class="detail">${esc(e.job_key ?? "")} ${esc(e.detail)}</span></div>`;
+    }).join("");
+
+  $("queue-list").innerHTML = s.queue.map((k) => {
+    const known = s.jobs.some((j) => j.key === k);
+    return `<div class="t-${known ? "grey" : "red"}">${icon(known ? "layers" : "alert")}<span class="detail">${esc(k)}</span>${known ? "" : '<span class="what">no job row</span>'}</div>`;
+  }).join("") || '<span class="empty-note">queue/ is empty.</span>';
+}
+
+/* ------------------------------------------------------------------ events */
+document.addEventListener("click", async (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el) return;
+  const d = el.dataset;
+  switch (d.act) {
+    case "run": return startTask(d.task, d.account);
+    case "run-cancel": return confirmDo("Cancel run", "Kill the running task? A publish already past its final click cannot be undone.", "Kill it",
+      () => api("/api/run/cancel", {}).then(() => toast("cancel sent")));
+    case "run-open": {
+      ui.runId = Number(d.id); ui.runFrom = 0; $("run-output").textContent = "";
+      $("console").hidden = false; $("console").classList.remove("collapsed");
+      $("console-toggle-label").textContent = "Hide output";
+      sizeConsole();
+      return pollRun();
+    }
+    case "console-toggle": {
+      const c = $("console").classList.toggle("collapsed");
+      $("console-toggle-label").textContent = c ? "Show output" : "Hide output";
+      return sizeConsole();
+    }
+    case "console-hide": { $("console").hidden = true; return sizeConsole(); }
+    case "stop": {
+      const on = !state.health.stop_file;
+      return confirmDo(on ? "Engage kill switch" : "Clear kill switch",
+        on ? "Writes STOP_AUTOMATION. The tick and the agents refuse to run until it is cleared."
+           : "Removes STOP_AUTOMATION. Scheduled tasks resume on their next fire.",
+        on ? "Stop everything" : "Resume", () => api("/api/stop", { on }).then(refresh), on ? "danger" : "primary");
+    }
+    case "pause": {
+      const paused = d.paused !== "1";
+      return api("/api/pause", { account: d.account, paused }).then(() => {
+        toast(`${d.account} ${paused ? "paused" : "resumed"}`); refresh();
+      });
+    }
+    case "chip": {
+      ui.statuses.has(d.status) ? ui.statuses.delete(d.status) : ui.statuses.add(d.status);
+      return render();
+    }
+    case "job-detail": return jobDetail(d.key);
+    case "resolve": {
+      const a = state.accounts.find((x) => d.key.startsWith(x.id + "-"));
+      const where = a?.platform === "instagram" ? "your Instagram profile" : "TikTok Studio";
+      const why = d.status === "PLANNED"
+        ? "Resets attempts to 0 and puts it back in the queue. Only do this if nothing was posted."
+        : d.status === "ARCHIVED" ? "Takes it out of every queue and count. The row stays."
+        : `Only after checking ${where} with your own eyes — this outcome cannot be inferred.`;
+      return confirmDo(`Mark ${d.key}`, `${why}`, `Mark ${d.status}`,
+        () => api("/api/resolve", { key: d.key, status: d.status }).then(() => { toast("recorded", "good"); refresh(); }),
+        d.status === "FAILED" ? "danger" : "primary");
+    }
+    case "metrics": {
+      modal({
+        title: `Log metrics · ${d.key}`,
+        body: `<div class="grid-form">
+          <input id="m-views" type="number" min="0" placeholder="views" autofocus>
+          <input id="m-likes" type="number" min="0" placeholder="likes">
+          <input id="m-comments" type="number" min="0" placeholder="comments">
+          <input id="m-shares" type="number" min="0" placeholder="shares"></div>`,
+        actions: [{ label: "Save", kind: "primary", run: () => {
+          api("/api/metrics", { key: d.key, views: $("m-views").value, likes: $("m-likes").value,
+            comments: $("m-comments").value, shares: $("m-shares").value })
+            .then(() => { toast("metrics logged", "good"); refresh(); });
+        } }],
+      });
+      return;
+    }
+    case "tpl-save": {
+      return confirmDo("Save agent brief", "Every account's next run uses this text. The current version is kept as agents/account.md.bak.",
+        "Save", () => api("/api/agent-template", { text: $("tpl").value })
+          .then(() => { ui.tplDirty = false; toast("brief saved", "good"); refresh(); }), "primary");
+    }
+    case "tpl-revert": { ui.tplDirty = false; $("tpl").value = state.agents.template; return render(); }
+    case "lib-filter": { ui.libUnused = !ui.libUnused; return render(); }
+    case "exp-new": { $("exp-form").hidden = false; $("exp-new").hidden = true; return; }
+    case "exp-cancel": { $("exp-form").hidden = true; $("exp-new").hidden = false; return; }
+    case "exp-create": {
+      if (!$("exp-name").value.trim()) return toast("name is required", "bad");
+      return api("/api/experiment", { name: $("exp-name").value, hypothesis: $("exp-hyp").value,
+        control: $("exp-control").value, variant: $("exp-variant").value })
+        .then(() => { $("exp-form").hidden = true; toast("experiment started", "good"); refresh(); });
+    }
+    case "exp-close": {
+      modal({ title: "Close experiment", body: `<div class="grid-form"><input id="exp-result" placeholder="Result / conclusion"></div>`,
+        actions: [{ label: "Close it", kind: "primary", run: () =>
+          api("/api/experiment", { close_id: Number(d.id), result: $("exp-result").value }).then(refresh) }] });
+      return;
+    }
+  }
+});
+
+$("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) setTab(b.dataset.tab); });
+$("job-search").addEventListener("input", (e) => { ui.search = e.target.value; render(); });
+$("log-filter").addEventListener("input", (e) => { ui.logFilter = e.target.value; render(); });
+$("tpl").addEventListener("input", () => { ui.tplDirty = true; $("tpl-count").textContent = `${$("tpl").value.length} chars · unsaved`; });
+window.addEventListener("beforeunload", (e) => { if (ui.tplDirty) e.preventDefault(); });
+
+document.addEventListener("keydown", (e) => {
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  if (e.key === "/") { e.preventDefault(); setTab("pipeline"); $("job-search").focus(); }
+  if (e.key === "r") refresh();
+  const tabs = ["desk", "agents", "pipeline", "content", "system"];
+  if (/^[1-5]$/.test(e.key)) setTab(tabs[Number(e.key) - 1]);
+});
+
+// Synchronous on purpose: rAF and ResizeObserver are both tied to the rendering
+// pipeline, so in a background tab the drawer would sit on top of the last rows.
+function sizeConsole() {
+  const c = $("console");
+  document.documentElement.style.setProperty("--console-h", c.hidden ? "0px" : `${c.offsetHeight}px`);
+}
+new ResizeObserver(sizeConsole).observe($("console"));
+
+setTab(ui.tab);
+refresh();
+setInterval(refresh, 15_000);
+</script>
+</body>
+</html>

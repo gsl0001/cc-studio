@@ -1,0 +1,31 @@
+{
+  "assistant": {
+    "name": "cc",
+    "voice": "cc_bright",
+    "autoHideMinutes": 3
+  },
+  "models": {
+    "creator": "claude-opus-5-5",
+    "strategist": "claude-opus-5-5",
+    "desk": "claude-haiku-4-5-20251001",
+    "plan": "sonnet"
+  },
+  "paths": {
+    "finals": "finals",
+    "workspaces": "workspaces",
+    "guidelines": "content/GUIDELINES.md",
+    "context": "content/CONTEXT.md",
+    "python": "python",
+    "handPost": null
+  },
+  "creator": {
+    "maxRunMinutes": 90,
+    "similarityLimit": 0.35,
+    "composition": "HyperFrames (npx hyperframes) or Remotion; plain ffmpeg for simple cuts",
+    "localVideoModels": "",
+    "paidVideoApis": false
+  },
+  "telegram": {
+    "enabled": true
+  }
+}
