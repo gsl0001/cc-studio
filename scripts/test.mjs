@@ -3,7 +3,7 @@
 //   npm test
 import { spawnSync } from "node:child_process";
 
-const tests = ["src/log.test.mjs", "src/insights.test.mjs", "src/library.test.mjs", "src/platforms/tiktok.metrics.test.mjs",
+const tests = ["scripts/setup-core.mjs", "src/log.test.mjs", "src/insights.test.mjs", "src/library.test.mjs", "src/platforms/tiktok.metrics.test.mjs",
   "auto_content_pipeline/tests/weekly.test.mjs"];
 let failed = 0;
 for (const t of tests) {

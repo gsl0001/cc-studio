@@ -12,9 +12,10 @@ unless absolute.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `assistant.name` | `"cc"` | What the desktop assistant calls itself in chat. |
+| `assistant.name` | `"cc"` | What the desktop assistant calls itself, in chat and on its window. |
 | `assistant.voice` | `"cc_bright"` | cc's voice: `cc_bright`, `cc_chill`, `cc_mellow` (presets in `scripts/voice.py`), any Kokoro voice id (`af_heart`, `am_michael`, ...), or a Windows voice name. cc's right-click menu overrides it per user. |
-| `assistant.autoHideMinutes` | `3` | Minutes without you before cc hides at the screen's edge; `0` never. |
+| `assistant.color` | `"charcoal"` | cc's body colour: `charcoal`, `snow`, `sky`, `mint`, `lavender`, `pink`, `peach` or `yellow`. cc's right-click menu overrides it per user. |
+| `assistant.autoHideMinutes` | `3` | Minutes without you before cc hides at the screen's edge; `0` never. cc's right-click menu overrides it per user. |
 | `models.creator` | `"claude-opus-5-5"` | Makes the videos. Env `CLAUDE_MODEL` overrides. |
 | `models.strategist` | `"claude-opus-5-5"` | Plans the week. Env `STRATEGIST_MODEL` overrides. |
 | `models.desk` | `"claude-haiku-4-5-20251001"` | cc's chat (fast). Env `DESK_MODEL` overrides. |

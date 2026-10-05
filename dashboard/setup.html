@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cc-studio setup</title>
+<style>
+  :root {
+    --bg: #0f0f12; --panel: #18181b; --raised: #27272a; --line: #3f3f46; --text: #f4f4f5; --muted: #a1a1aa;
+    --accent: #2c7dff; --ok: #2ed15a; --bad: #ff3b30;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: #7fb0ff; }
+  .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: 100vh; max-width: 1100px; margin: 0 auto; }
+
+  /* left: cc and the sections */
+  .side { padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px; border-right: 1px solid var(--raised); }
+  .stage { position: relative; width: 240px; padding-top: 10px; cursor: pointer; user-select: none; }
+  .float { animation: float 3.4s ease-in-out infinite alternate; }
+  @keyframes float { from { transform: translateY(0); } to { transform: translateY(-9px); } }
+  .avatar { position: relative; width: 100%; aspect-ratio: 363 / 308; }
+  .avatar > *, .pony-inner > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .body-layer { transition: opacity .35s; }
+  .pony { position: absolute; inset: 0; transform-origin: 41.3% 44.2%; transform: rotate(var(--pose, 0deg)); transition: transform .55s cubic-bezier(.34, 1.56, .64, 1); }
+  .pony-inner { position: absolute; inset: 0; transform-origin: 41.3% 44.2%; animation: bob 2.6s ease-in-out infinite alternate; }
+  .speak .pony-inner { animation: wag .32s ease-in-out infinite alternate; }
+  .busy .pony-inner { animation: pulse .7s ease-in-out infinite alternate; }
+  @keyframes bob { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+  @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+  .glow { animation: glow 2.2s ease-in-out infinite alternate; }
+  @keyframes glow { from { opacity: .35; } to { opacity: .9; } }
+  .shadow { width: 56%; height: 16px; margin: -12px 0 0 9%; border-radius: 50%; background: radial-gradient(var(--pony, #2c7dff) 0, transparent 70%); opacity: .5; animation: shadow 3.4s ease-in-out infinite alternate; transition: background .4s; }
+  @keyframes shadow { from { transform: scale(1); } to { transform: scale(.82); opacity: .3; } }
+  .eye, .happy { transform-box: fill-box; transform-origin: center; transition: transform .28s cubic-bezier(.34, 1.4, .64, 1), opacity .2s, height .2s; }
+  .gaze { transition: transform .28s ease-out; }
+  .blink .eye { transform: scaleY(.08); transition-duration: .07s; }
+  .is-happy .eye { opacity: 0; }
+  .happy { opacity: 0; }
+  .is-happy .happy { opacity: 1; }
+  .is-busy .eye { transform: scaleY(.88); }
+  .hop { animation: hop .6s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes hop { 0% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(4px) scale(1.08, .9); } 50% { transform: translateY(-22px) scale(.95, 1.06); } 100% { transform: translateY(0) scale(1, 1); } }
+  .spark { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; animation: spark .9s ease-out forwards; }
+  @keyframes spark { to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
+  .who { text-align: center; }
+  .who b { font-size: 22px; display: block; letter-spacing: .2px; }
+  .who span { color: var(--muted); font-size: 13px; }
+  .steps { list-style: none; padding: 0; margin: 8px 0 0; width: 100%; }
+  .steps li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; color: var(--muted); font-size: 14px; }
+  .steps li::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+  .steps li.now { color: var(--text); background: var(--panel); }
+  .steps li.now::before { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px #2c7dff33; }
+  .steps li.done::before { border-color: var(--ok); background: var(--ok); }
+
+  /* right: the chat */
+  .chat { display: flex; flex-direction: column; min-height: 0; }
+  .feed { flex: 1; overflow-y: auto; padding: 28px 28px 12px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+  .msg { max-width: 78%; padding: 10px 14px; border-radius: 16px; animation: in .28s cubic-bezier(.2, 1.2, .4, 1); white-space: pre-wrap; overflow-wrap: anywhere; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+  .bot { background: var(--panel); border: 1px solid var(--raised); border-bottom-left-radius: 4px; align-self: flex-start; }
+  .me { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+  .note { align-self: flex-start; color: var(--muted); font-size: 13px; padding: 0 4px; }
+  .dots span { display: inline-block; width: 7px; height: 7px; margin: 0 2px; border-radius: 50%; background: var(--muted); animation: dot 1s infinite; }
+  .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+  .swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 64px)); gap: 10px; margin-top: 8px; }
+  .swatch { width: 100%; aspect-ratio: 1; border-radius: 14px; border: 2px solid var(--raised); background: var(--raised) center / 120% no-repeat; cursor: pointer; transition: transform .15s, border-color .15s; }
+  .swatch:hover { transform: translateY(-3px); border-color: var(--muted); }
+  .swatch.on { border-color: var(--accent); }
+  .voices { display: grid; gap: 8px; margin-top: 8px; }
+  .voice { display: flex; align-items: center; gap: 8px; }
+  .voice .chip { flex: 1; text-align: left; }
+  .play { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--raised); color: var(--text); cursor: pointer; }
+  .play:disabled { opacity: .4; cursor: default; }
+  .card { background: var(--panel); border: 1px solid var(--raised); border-radius: 14px; padding: 12px 14px; align-self: stretch; animation: in .28s; }
+  .card dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+  .card dt { color: var(--muted); }
+  .card dd { margin: 0; }
+  .task { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--raised); }
+  .task:first-child { border-top: 0; }
+  .task small { color: var(--muted); display: block; }
+  .task pre { grid-column: 1 / -1; margin: 6px 0 0; max-height: 220px; overflow: auto; background: #0b0b0d; border-radius: 8px; padding: 8px 10px; font: 12px/1.45 ui-monospace, Consolas, monospace; color: #d4d4d8; white-space: pre-wrap; }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+
+  .composer { padding: 10px 28px 22px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 0; }
+  .chip, .btn { border: 1px solid var(--line); background: var(--raised); color: var(--text); padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+  .chip:hover, .btn:hover { border-color: var(--muted); }
+  .chip:active, .btn:active { transform: scale(.97); }
+  .chip.main, .btn.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .bar { display: flex; gap: 8px; align-items: flex-end; background: var(--panel); border: 1px solid var(--raised); border-radius: 16px; padding: 6px 6px 6px 14px; transition: border-color .15s; }
+  .bar:focus-within { border-color: var(--line); }
+  .bar.off { opacity: .45; }
+  .bar.shake { animation: shake .35s; border-color: var(--bad); }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  #input { flex: 1; background: none; border: 0; outline: 0; color: var(--text); font: inherit; resize: none; padding: 7px 0; max-height: 140px; overflow: hidden; }
+  #send { width: 38px; height: 38px; border-radius: 12px; border: 0; background: var(--accent); color: #fff; font-size: 18px; cursor: pointer; flex: none; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 6px 4px 0; min-height: 18px; }
+
+  @media (max-width: 760px) {
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    .side { flex-direction: row; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--raised); gap: 12px; }
+    .stage { width: 92px; padding-top: 0; }
+    .who { text-align: left; } .who b { font-size: 18px; }
+    .steps { display: none; }
+    .feed { padding: 16px; } .composer { padding: 8px 16px 16px; }
+    .msg { max-width: 90%; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="stage" id="stage" title="Click me">
+      <div class="float"><div id="hopper">
+        <div class="avatar idle" id="avatar">
+          <img class="body-layer" id="body" alt="">
+          <div class="pony" id="pony"><div class="pony-inner"><img class="glow" id="glow" alt=""><img id="ponyImg" alt=""></div></div>
+          <svg viewBox="0 0 363 308" id="face" aria-hidden="true">
+            <g class="gaze" id="gaze">
+              <rect class="eye" x="112" y="189" width="18" height="42" rx="9"/>
+              <rect class="eye" x="154" y="189" width="18" height="42" rx="9"/>
+              <path class="happy" d="M 112,215 Q 121,199 130,215" fill="none" stroke-width="5" stroke-linecap="round"/>
+              <path class="happy" d="M 154,215 Q 163,199 172,215" fill="none" stroke-width="5" stroke-linecap="round"/>
+            </g>
+          </svg>
+        </div>
+      </div></div>
+      <div class="shadow" id="shadow"></div>
+    </div>
+    <div class="who"><b id="name">cc</b><span>your desktop assistant</span></div>
+    <ul class="steps" id="steps">
+      <li data-s="you">Me</li><li data-s="projects">Your projects</li><li data-s="approvals">Approvals</li>
+      <li data-s="voiceover">Voiceover and music</li><li data-s="tools">Tools</li><li data-s="save">Save</li><li data-s="finish">Finish</li>
+    </ul>
+  </aside>
+  <main class="chat">
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="composer">
+      <div class="chips" id="chips"></div>
+      <form class="bar off" id="bar">
+        <textarea id="input" rows="1" placeholder="Wait for a question..." disabled></textarea>
+        <button id="send" aria-label="Send">&#10148;</button>
+      </form>
+      <div class="hint" id="hint"></div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BODY = { charcoal: "#2c2d33", snow: "#e8e9ee", sky: "#2f78e8", mint: "#3fb284", lavender: "#986cde", pink: "#ec80b0", peach: "#ec8c70", yellow: "#ecbe3c" };
+const PONY = { blue: "#2C7DFF", green: "#2ED15A", yellow: "#FFC21A", purple: "#9B3BFF", red: "#FF3B30", orange: "#FF7A1A", pink: "#FF5FA8", cyan: "#19D3F0" };
+// What cc shows in each mood: the pony's colour and pose (as in cc itself) and its eyes.
+const MOOD = { idle: ["blue", 0], listen: ["green", -42], speak: ["purple", 0], busy: ["orange", 32], bad: ["red", 63], happy: ["pink", -17] };
+const slug = (s) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "project";
+const isTimes = (s) => s.split(/[\s,]+/).filter(Boolean).every((t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t));
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.headers.get("content-type")?.includes("json") ? r.json() : r;
+}
+
+// ------------------------------------------------------------------ cc
+let S = {}, layers = false;
+const av = {
+  mood: "idle", color: "charcoal",
+  setColor(c) {
+    this.color = c;
+    if (layers) $("#body").src = `/avatar/body_${c}.png`;
+    else $("#body").src = svgBody(BODY[c]);
+    const light = c === "snow" || (!layers && ["yellow", "peach", "pink", "mint"].includes(c));
+    for (const e of document.querySelectorAll("#face .eye")) e.setAttribute("fill", light ? "#28292e" : "#fafafc");
+    for (const e of document.querySelectorAll("#face .happy")) e.setAttribute("stroke", light ? "#28292e" : "#fafafc");
+  },
+  set(m) {
+    if (m === this.mood) return;
+    this.mood = m;
+    const [c, pose] = MOOD[m];
+    $("#pony").style.setProperty("--pose", `${pose}deg`);
+    if (layers) { $("#ponyImg").src = `/avatar/pony_${c}_neutral.png`; $("#glow").src = `/avatar/glow_${c}_neutral.png`; }
+    else $("#ponyImg").src = svgPony(PONY[c]);
+    $("#shadow").style.setProperty("--pony", PONY[c]);
+    $("#avatar").className = `avatar ${m}`;
+    $("#face").classList.toggle("is-busy", m === "busy");
+    $("#face").classList.toggle("is-happy", m === "happy");
+    if (m === "busy") look(-5, -6);
+  },
+  happy(ms = 1400) { this.set("happy"); this.hop(); clearTimeout(this.t); this.t = setTimeout(() => this.set("idle"), ms); },
+  hop() { const h = $("#hopper"); h.classList.remove("hop"); void h.offsetWidth; h.classList.add("hop"); sparks(); },
+};
+// Without a built avatar (npm run avatar), a simple drawing stands in.
+const svgUrl = (s) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 363 308">${s}</svg>`)}`;
+const svgBody = (fill) => svgUrl(`<ellipse cx="142" cy="212" rx="96" ry="84" fill="${fill}"/><ellipse cx="112" cy="294" rx="22" ry="9" fill="${fill}"/><ellipse cx="172" cy="294" rx="22" ry="9" fill="${fill}"/>`);
+const svgPony = (fill) => svgUrl(`<path d="M150 136 C158 76 214 34 286 40 C246 58 210 92 178 146 Z" fill="${fill}"/>`);
+function look(x, y) { $("#gaze").style.transform = `translate(${x}px, ${y}px)`; }
+function blink() {
+  $("#face").classList.add("blink");
+  setTimeout(() => $("#face").classList.remove("blink"), 130);
+  setTimeout(blink, 2400 + Math.random() * 3800);
+}
+let lastMove = 0;
+document.addEventListener("mousemove", (e) => {
+  lastMove = Date.now();
+  if (av.mood === "busy") return;
+  const r = $("#avatar").getBoundingClientRect(), dx = e.clientX - (r.left + r.width * .39), dy = e.clientY - (r.top + r.height * .68);
+  const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 400);
+  look(dx / d * 9 * k, dy / d * 6 * k);
+});
+setInterval(() => { if (Date.now() - lastMove > 2500 && av.mood !== "busy") look((Math.random() - .5) * 14, (Math.random() - .5) * 8); }, 2600);
+function sparks() {
+  const st = $("#stage");
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement("i"), a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 50;
+    s.className = "spark";
+    s.style.cssText = `left:${38 + Math.random() * 10}%;top:${40 + Math.random() * 10}%;background:${Object.values(PONY)[i % 8]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
+    st.appendChild(s); setTimeout(() => s.remove(), 950);
+  }
+}
+$("#stage").addEventListener("click", () => av.happy(900));
+
+// ------------------------------------------------------------------ chat
+const feed = $("#feed"), input = $("#input"), bar = $("#bar"), chips = $("#chips"), hint = $("#hint");
+const scroll = () => (feed.scrollTop = feed.scrollHeight);
+function bubble(cls, text) { const d = document.createElement("div"); d.className = `msg ${cls}`; d.textContent = text; feed.appendChild(d); scroll(); return d; }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+async function say(text, extra) {
+  av.set("speak");
+  const d = el("div", "msg bot dots"); d.innerHTML = "<span></span><span></span><span></span>"; feed.appendChild(d); scroll();
+  await sleep(Math.min(250 + text.length * 9, 1000));
+  d.className = "msg bot"; d.textContent = text;
+  if (extra) d.appendChild(extra);
+  scroll();
+  if (av.mood === "speak") av.set("idle");
+  return d;
+}
+const note = (t) => { const d = el("div", "note", t); feed.appendChild(d); scroll(); };
+function section(s) {
+  let seen = false;
+  for (const li of document.querySelectorAll("#steps li")) {
+    const now = li.dataset.s === s;
+    li.className = now ? "now" : seen ? "" : "done";
+    if (now) seen = true;
+  }
+}
+
+// One question: resolves with what was typed (Enter alone = the default) or the chip pressed.
+// o: { def, placeholder, type: "text" | "password" | "lines" | "none", chips: [[label, value, main]], optional, check(v) -> problem }
+let answer = null;
+function ask(o = {}) {
+  return new Promise((resolve) => {
+    const type = o.type ?? "text";
+    chips.replaceChildren();
+    const done = (value, shown) => {
+      answer = null; chips.replaceChildren(); hint.textContent = "";
+      bar.classList.add("off"); input.disabled = true; input.value = ""; input.placeholder = "Wait for a question..."; fit();
+      if (shown !== "") bubble("me", shown);
+      if (av.mood === "listen") av.set("idle");
+      resolve(value);
+    };
+    const list = [...(o.chips ?? [])];
+    if (o.def !== undefined && o.def !== "" && type !== "none" && type !== "password") list.unshift([`Keep "${o.def}"`, o.def, true]);
+    if (o.optional) list.push(["Skip", ""]);
+    for (const [label, value, main] of list) {
+      const b = el("button", `chip${main ? " main" : ""}`, label);
+      b.onclick = () => done(value, value === "" ? "Skip" : label.replace(/^Keep "(.*)"$/, "$1"));
+      chips.appendChild(b);
+    }
+    requestAnimationFrame(() => feed.scrollTo({ top: feed.scrollHeight, behavior: "instant" }));
+    if (type === "none") { bar.classList.add("off"); input.disabled = true; answer = null; return; }
+    bar.classList.remove("off"); input.disabled = false;
+    input.placeholder = o.placeholder ?? (o.def ? `Enter keeps "${o.def}"` : "Type here...");
+    input.style.webkitTextSecurity = type === "password" ? "disc" : "";
+    hint.textContent = type === "lines" ? "One per line (Shift+Enter for a new line), then Enter." : type === "password" ? "Pasted into your local .env only; it never leaves this computer except to the service it's for." : "";
+    input.dataset.type = type;
+    input.focus();
+    answer = (v) => {
+      v = v.trim();
+      if (!v && o.def !== undefined) v = String(o.def);
+      if (!v && !o.optional) return shake("This one's needed.");
+      const problem = v && o.check?.(v);
+      if (problem) return shake(problem);
+      done(v, !v ? "Skip" : type === "password" ? "•".repeat(10) : v);
+    };
+    input.oninput = () => { fit(); o.onInput?.(input.value.trim()); av.set(input.value ? "listen" : "idle"); };
+  });
+}
+function shake(msg) { bar.classList.remove("shake"); void bar.offsetWidth; bar.classList.add("shake"); hint.textContent = msg; av.set("bad"); setTimeout(() => av.set("idle"), 900); }
+function fit() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 140)}px`; input.style.overflowY = input.scrollHeight > 140 ? "auto" : "hidden"; }
+bar.addEventListener("submit", (e) => { e.preventDefault(); answer?.(input.value); });
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); answer?.(input.value); }
+});
+const yesNo = async (yesLabel = "Yes", noLabel = "No", def = true) => (await ask({ type: "none", chips: [[yesLabel, "y", def], [noLabel, "n", !def]] })) === "y";
+const pick = (options) => ask({ type: "none", chips: options });
+
+// A widget inside a bot message (colours, voices) that answers like a chip.
+function widget(text, build) {
+  return new Promise((resolve) => {
+    chips.replaceChildren(); bar.classList.add("off"); input.disabled = true;
+    const box = el("div");
+    build(box, (value, shown) => { for (const b of box.querySelectorAll("button")) b.disabled = true; bubble("me", shown); resolve(value); });
+    say(text, box);
+  });
+}
+
+// ------------------------------------------------------------------ the conversation
+const A = {}, out = { projects: [] };
+async function main() {
+  S = await api("/api/state");
+  Object.assign(A, S.assistant);
+  if (S.avatar) layers = await new Promise((r) => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = "/avatar/body_charcoal.png"; });
+  av.setColor(A.color ?? "charcoal"); av.mood = ""; av.set("idle"); setTimeout(blink, 1500);
+  $("#name").textContent = A.name;
+  await sleep(400); av.hop();
+
+  section("you");
+  await say("Hi! I'm your new desktop assistant. I'll help you plan your short videos, make them and get them posted, and I'll check with you before anything goes out.");
+  await say("Let's set me up first. What should I be called?");
+  A.name = await ask({ def: A.name, check: (v) => (v.length > 24 ? "Keep it under 25 letters." : ""), onInput: (v) => ($("#name").textContent = v || A.name) });
+  $("#name").textContent = A.name; av.happy();
+  await say(`${A.name}. I love it.`);
+
+  const c0 = A.color ?? "charcoal";
+  A.color = await widget("Now pick my colour. Hover to try one on.", (box, choose) => {
+    const g = el("div", "swatches");
+    for (const c of S.colors) {
+      const b = el("button", `swatch${c === c0 ? " on" : ""}`); b.title = c; b.setAttribute("aria-label", c);
+      b.style.backgroundImage = layers ? `url(/avatar/body_${c}.png)` : "none";
+      if (!layers) b.style.background = BODY[c];
+      b.onmouseenter = () => { if (!b.disabled) av.setColor(c); };
+      b.onclick = () => { for (const x of g.children) x.classList.toggle("on", x === b); av.setColor(c); av.happy(); choose(c, c[0].toUpperCase() + c.slice(1)); };
+      g.appendChild(b);
+    }
+    g.onmouseleave = () => { if (!b0().disabled) av.setColor(c0); };
+    const b0 = () => g.firstChild;
+    box.appendChild(g);
+  });
+  av.setColor(A.color);
+
+  A.voice = await widget(S.voiceServer ? "And how should I sound? Press play to hear each voice." : "And how should I sound? (You can hear them once my voice is installed at the end.)", (box, choose) => {
+    const g = el("div", "voices");
+    for (const [id, label] of S.voices) {
+      const row = el("div", "voice"), b = el("button", `chip${id === A.voice ? " main" : ""}`, `${label[0].toUpperCase()}${label.slice(1)}`), p = el("button", "play", "▶");
+      p.disabled = !S.voiceServer; p.setAttribute("aria-label", `Play ${label}`);
+      p.onclick = async () => {
+        p.disabled = true; av.set("speak");
+        try { const r = await api("/api/voice", { voice: id, text: `Hi, I'm ${A.name}. Let's make something people love.` }); const a = new Audio(URL.createObjectURL(await r.blob())); a.onended = () => av.set("idle"); await a.play(); }
+        catch { av.set("idle"); note("Couldn't play that one."); }
+        p.disabled = false;
+      };
+      b.onclick = () => { for (const x of g.querySelectorAll(".chip")) x.classList.toggle("main", x === b); av.happy(); choose(id, b.textContent); };
+      row.append(b, p); g.appendChild(row);
+    }
+    box.appendChild(g);
+  });
+
+  await say("When you leave me alone for a while, I tuck myself at the edge of your screen with just my ponytail poking out. Click it and I pop back. After how long should I hide?");
+  A.autoHideMinutes = Number(await pick([["After 1 minute", 1, A.autoHideMinutes === 1], ["After 3 minutes", 3, A.autoHideMinutes === 3], ["After 10 minutes", 10, A.autoHideMinutes === 10], ["Never", 0, A.autoHideMinutes === 0]]));
+  if (!S.windows) note("I live on the Windows desktop; on this system you'll talk to me through Telegram, and these choices name me there.");
+  if (!S.claude) await say("One thing before we go on: I think with Claude Code, and I can't find it here. Install it from claude.com/claude-code and log in once. You can keep going with setup meanwhile.");
+
+  section("projects");
+  if (S.projects.length) {
+    await say(`You already have ${S.projects.join(", ")}. Want to add another project?`);
+    if (await yesNo("Add a project", "No, keep those", false)) await projects();
+  } else {
+    await say("Now your projects. A project is a brand, product or channel; each one gets its own accounts, rules and asset folder.");
+    await projects();
+  }
+
+  section("approvals");
+  await telegram();
+
+  section("voiceover");
+  await say("Voiceover and music: with an ElevenLabs key, videos get a spoken voiceover and a music bed. Without it, they use on-screen text and your own music.");
+  if (S.eleven && (await yesNo("Keep my current key", "Use a new key"))) note("Keeping the current ElevenLabs key.");
+  else out.eleven = await ask({ type: "password", optional: true, placeholder: "ElevenLabs API key (elevenlabs.io > Profile > API keys)" });
+
+  section("tools");
+  await tools();
+
+  section("save");
+  await save();
+}
+
+async function projects() {
+  for (;;) {
+    const p = { accounts: [] };
+    await say("What's the project called?");
+    p.name = await ask({ placeholder: "e.g. Acme Notes" });
+    await say(`Is ${p.name} a product you market, or a channel you grow with content?`);
+    p.type = await pick([["A product or app (claims and a call to action)", "app", true], ["A channel (no product)", "channel"]]);
+    await say(`In one sentence, what is ${p.name}?`);
+    p.one_liner = await ask({ optional: true });
+    await say("Who is it for? A few words, separated by commas.");
+    p.audience = await ask({ optional: true, placeholder: "e.g. students, freelance writers" });
+    await say("Its website, if it has one.");
+    p.site_url = await ask({ optional: true, placeholder: "https://" });
+    if (p.type === "app") {
+      await say("What may the videos claim? Only true statements you can back up, like “Works offline.”");
+      p.approved_claims = await ask({ type: "lines", optional: true });
+      await say("What should every video end with?");
+      p.cta = await ask({ def: "Link in bio" });
+    }
+    await say("Anything videos must never claim? (“the fastest”, “uses AI”...)");
+    p.forbidden_claims = await ask({ type: "lines", optional: true });
+    await say("Which language should the videos use?");
+    p.language_note = await ask({ def: "English only." });
+    await say("How long should videos be?");
+    p.duration = await ask({ type: "none", chips: [["8 to 20 seconds", "8-20", true], ["15 to 30 seconds", "15-30"], ["30 to 60 seconds", "30-60"]] });
+    const ws = `${S.workspaces}/${slug(p.name)}`;
+    await say(`Where are ${p.name}'s assets: logos, screenshots, clips? I'll make the folder if it's new, and the creator builds videos from what's in it.`);
+    p.workspace = await ask({ def: ws });
+    await say("Is there a word my voice should say differently? Write it like Acme=Ack-me.");
+    p.pronounce = await ask({ optional: true, check: (v) => (/^[^=]+=[^=]+$/.test(v) ? "" : "Write it as Word=Sounds-like.") });
+    av.happy();
+    for (;;) {
+      const a = {};
+      await say(p.accounts.length ? "Which platform is the next account on?" : `Now ${p.name}'s accounts. Which platform is the first one on?`);
+      a.platform = await pick(S.platforms.map(([k, label], i) => [label, k, i === 0]));
+      await say("Its handle?");
+      a.handle = (await ask({ placeholder: "without the @" })).replace(/^@/, "");
+      await say("What do you call this account? I'll use this name when I talk about it.");
+      a.name = await ask({ def: p.accounts.length ? `${p.name} ${a.handle}` : p.name });
+      await say("When should it post? 24-hour times, separated by commas.");
+      a.slots = await ask({ def: "18:00", check: (v) => (isTimes(v) ? "" : "Use times like 09:30, 18:00.") });
+      await say("Once you approve a video, should I post it automatically? Otherwise I upload it and you press Post yourself.");
+      a.auto = await yesNo("Post automatically", "I'll press Post");
+      await say("What's this account about, in one line? Or skip and the strategist will propose something from its numbers.");
+      a.pillar = await ask({ optional: true });
+      if (a.pillar) { await say("And its voice, in a few words?"); a.voice = await ask({ def: "friendly, short spoken lines" }); }
+      p.accounts.push(a);
+      await say(`Got @${a.handle}. Another account for ${p.name}?`);
+      if (!(await yesNo("Add an account", "That's all", false))) break;
+    }
+    out.projects.push(p);
+    await say("Another project?");
+    if (!(await yesNo("Add a project", "That's all", false))) return;
+  }
+}
+
+async function telegram() {
+  await say("Approvals: when a video is ready I can send it to your phone in Telegram, and you answer yes or no there. Without Telegram you approve in my chat.");
+  const c = await pick(S.telegram ? [["Keep my current bot", "keep", true], ["Use a different bot", "new"], ["Skip", "skip"]] : [["Set up Telegram", "new", true], ["Skip for now", "skip"]]);
+  if (c !== "new") return;
+  const how = el("div"); how.innerHTML = `<br>1. In Telegram, open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> and send <b>/newbot</b>.<br>2. Pick a name and a username for it.<br>3. Paste the token it gives you here.<br><br>Use a bot that only cc-studio uses.`;
+  await say("Let's make a bot for it.", how);
+  for (;;) {
+    const token = await ask({ type: "password", placeholder: "Bot token, like 123456:ABC..." });
+    av.set("busy");
+    const { username } = await api("/api/telegram/check", { token }).catch(() => ({}));
+    if (!username) {
+      await say("Telegram didn't accept that token. Check it and try again?");
+      if (await yesNo("Try again", "Skip Telegram")) continue;
+      return;
+    }
+    out.telegramToken = token; av.happy();
+    const link = el("div"); link.innerHTML = `<br><a href="https://t.me/${username}" target="_blank" rel="noopener">Open @${username}</a>`;
+    await say(`Found @${username}. Now send it any message in Telegram, so I know where to reach you. I'm watching...`, link);
+    av.set("busy");
+    let chat = null;
+    for (let i = 0; i < 24 && !chat; i++) chat = (await api("/api/telegram/chat", { token }).catch(() => ({}))).chat;
+    if (chat) { out.telegramChat = String(chat); av.happy(); await say("Got your message. Approvals will come to that chat."); }
+    else {
+      av.set("idle");
+      await say("I didn't see a message. You can type your chat id instead, or skip and set it later.");
+      out.telegramChat = await ask({ optional: true, check: (v) => (/^-?\d+$/.test(v) ? "" : "A chat id is a number.") });
+    }
+    return;
+  }
+}
+
+async function tools() {
+  await say("Last, the tools on this computer. The similarity check and my avatar need Python 3.10 or newer, with opencv, numpy and pillow.");
+  let py = S.python;
+  for (;;) {
+    av.set("busy");
+    const { ready } = await api("/api/python", { python: py }).catch(() => ({}));
+    av.set("idle");
+    if (ready) { out.python = py; await say(`"${py}" has everything I need.`); break; }
+    await say(`"${py}" is missing opencv, numpy or pillow (or isn't a Python).`);
+    const c = await pick([["Install them now", "install", true], ["Use a different Python", "other"], ["Skip", "skip"]]);
+    if (c === "skip") { out.python = py; break; }
+    if (c === "other") { await say("Type the Python command or its full path."); py = await ask({ def: py }); continue; }
+    const r = await run("pydeps", null, py);
+    if (!r) { out.python = py; await say("That didn't work; you can run pip yourself later. Moving on."); break; }
+  }
+  await say("May the creator use paid video-generation APIs (Runway, Kling, Veo...)? If not, posts that would need them wait for you.");
+  out.paidVideoApis = await yesNo("Yes, it may", "No, ask me", S.paidVideoApis);
+  await say("Any local video models on this computer the creator may run? Say which and how; or skip.");
+  out.localVideoModels = await ask({ optional: true, def: S.localVideoModels || undefined });
+}
+
+async function save() {
+  const dl = el("dl");
+  const row = (k, v) => { dl.append(el("dt", "", k), el("dd", "", v)); };
+  row("Name", A.name); row("Colour", A.color); row("Voice", S.voices.find(([k]) => k === A.voice)?.[1] ?? A.voice);
+  row("Hides after", A.autoHideMinutes ? `${A.autoHideMinutes} min` : "never");
+  for (const p of out.projects) row(p.name, p.accounts.map((a) => `@${a.handle} (${a.platform})`).join(", ") || "no accounts");
+  if (!out.projects.length) row("Projects", S.projects.join(", ") || "none yet");
+  row("Telegram", out.telegramToken ? "new bot" : S.telegram ? "current bot" : "off");
+  row("ElevenLabs", out.eleven ? "new key" : S.eleven ? "current key" : "off");
+  row("Python", out.python);
+  const card = el("div", "card"); card.appendChild(dl);
+  await say("Here's everything. Save it?");
+  feed.appendChild(card); scroll();
+  for (;;) {
+    const c = await pick([["Save", "save", true], ["Start over", "over"]]);
+    if (c === "over") return location.reload();
+    av.set("busy");
+    try {
+      out.saved = await api("/api/save", { assistant: A, ...out });
+      break;
+    } catch (e) { av.set("bad"); await say(`Saving failed: ${e.message}. Try again?`); }
+  }
+  av.happy(1800);
+  await say("Saved! Your settings are in studio.config.json and .env, and each project has its own folder under apps/.");
+  section("finish");
+  await finish();
+}
+
+// A setup step run on this computer, its output shown live. Resolves true when it worked.
+async function run(step, account, python, pre) {
+  if (!pre) { pre = el("pre"); const c = el("div", "card"); c.appendChild(pre); feed.appendChild(c); scroll(); }
+  pre.textContent = ""; av.set("busy");
+  try {
+    const r = await api("/api/run", { step, account, python });
+    const rd = r.body.getReader(), dec = new TextDecoder();
+    for (;;) { const { value, done } = await rd.read(); if (done) break; pre.textContent += dec.decode(value, { stream: true }); pre.scrollTop = pre.scrollHeight; scroll(); }
+  } catch (e) { pre.textContent += `\n${e.message}\n[exit 1]`; }
+  const ok = /\[exit 0\]\s*$/.test(pre.textContent);
+  av.set(ok ? "idle" : "bad"); if (ok) av.happy(); else setTimeout(() => av.set("idle"), 1500);
+  return ok;
+}
+
+async function finish() {
+  const tasks = [];
+  for (const p of out.saved.projects) for (const a of p.accounts) tasks.push(["login", a.id, `Log in to @${a.handle}`, `A Chrome window opens on ${a.platform}: log in, then close it. I only ever reuse that session.`]);
+  if (S.windows) {
+    tasks.push(["avatar", null, "Build my look", "Draws my avatar for the desktop (Python)."]);
+    tasks.push(["voice", null, "Install my voice", "An offline voice: a Python environment and a 340 MB download."]);
+  }
+  tasks.push(["tasks", null, "Start the schedule", "Registers the scheduled jobs: the planner, the creator, the Telegram bot, my desk and me at login. Skip it if another app on this computer already uses port 4820."]);
+  tasks.push(["doctor", null, "Health check", "Checks every part and says what's missing."]);
+  await say("A few last steps, each runs here on this computer. Do the ones you want, in any order.");
+  const card = el("div", "card");
+  for (const [step, account, title, desc] of tasks) {
+    const t = el("div", "task"), info = el("div"), b = el("button", "btn", "Run"), st = el("span", "status");
+    info.append(el("b", "", title), st, el("small", "", desc));
+    const right = el("div"); right.appendChild(b);
+    t.append(info, right);
+    b.onclick = async () => {
+      b.disabled = true; st.className = "status"; st.textContent = " · running";
+      let pre = t.querySelector("pre"); if (!pre) { pre = el("pre"); t.appendChild(pre); }
+      const ok = await run(step, account, null, pre);
+      st.className = `status ${ok ? "ok" : "bad"}`; st.textContent = ok ? " · done" : " · failed";
+      b.textContent = ok ? "Run again" : "Retry"; b.disabled = false;
+      if (ok && step === "avatar") { S.avatar = layers = true; av.setColor(A.color); const m = av.mood; av.mood = ""; av.set(m); }
+    };
+    card.appendChild(t);
+  }
+  feed.appendChild(card); scroll();
+  await pick([["I'm done", "done", true]]);
+  av.happy(2400);
+  await say(`All set! The strategist plans next week on Saturday evening (or now, with npm run strategist), the creator makes one video at a time, and each one comes to you for a yes or no. See you on the desktop. — ${A.name}`);
+  await api("/api/quit", {}).catch(() => {});
+  note("Setup is closed; you can close this tab. Run npm run setup again any time to change things.");
+}
+
+main().catch((e) => { av.set("bad"); bubble("bot", `Something went wrong: ${e.message}. Is the setup window still running?`); });
+</script>
+</body>
+</html>

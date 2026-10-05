@@ -6,7 +6,8 @@
   "type": "module",
   "engines": { "node": ">=22.5" },
   "scripts": {
-    "setup": "node scripts/setup.mjs",
+    "setup": "node scripts/setup-gui.mjs",
+    "setup:cli": "node scripts/setup.mjs",
     "doctor": "node scripts/doctor.mjs",
     "login": "node src/setup.js",
     "tasks:install": "node scripts/tasks.mjs install",

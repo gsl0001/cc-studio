@@ -162,7 +162,7 @@ function Log($lvl, $msg, $extra) {
                   <Image x:Name="HeadFace" Margin="3" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="cc" FontWeight="SemiBold" FontSize="15" Foreground="#FFF4F4F5"/>
+                  <TextBlock x:Name="NameText" Text="cc" FontWeight="SemiBold" FontSize="15" Foreground="#FFF4F4F5"/>
                   <StackPanel Orientation="Horizontal">
                     <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="#FF22C55E" Margin="0,1,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="StatusText" Text="Online" FontSize="11.5" Foreground="#FFA1A1AA"/>
@@ -282,7 +282,7 @@ function Log($lvl, $msg, $extra) {
 $win = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xaml))
 $el = @{}
 foreach ($n in "Panel","CloseBtn","PauseBtn","Pills","ActBtn","Hint","Input","Chips","Scroll","Feed","Bubble","BubbleText","Toast","ToastIcon","ToastText",
-               "StatusDot","StatusText","CtrlBtn","FolderBtn","Bot","Squish","Hop","Shadow","ShadowScale","Avatar","Appear","Sway","Float","Body","PonyOld","Pony","PonyScale","PonyPose","PonyTurn","Rest","Peek","Glow","Fx","Face","GazeT","EyeL","EyeR","EyeLS","EyeRS","EyeLT","EyeRT","HappyL","HappyR","Badge","BadgeText","VoiceBtn","HeadFace","Stage","BotSize","BubbleDot","BubbleTail") { $el[$n] = $win.FindName($n) }
+               "StatusDot","StatusText","CtrlBtn","FolderBtn","Bot","Squish","Hop","Shadow","ShadowScale","Avatar","Appear","Sway","Float","Body","PonyOld","Pony","PonyScale","PonyPose","PonyTurn","Rest","Peek","Glow","Fx","Face","GazeT","EyeL","EyeR","EyeLS","EyeRS","EyeLT","EyeRT","HappyL","HappyR","Badge","BadgeText","VoiceBtn","HeadFace","Stage","BotSize","BubbleDot","BubbleTail","NameText") { $el[$n] = $win.FindName($n) }
 function Brush($hex) { New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($hex)) }
 function Anim($from, $to, $ms, $reverse, $forever) {
   $a = New-Object System.Windows.Media.Animation.DoubleAnimation($from, $to, [TimeSpan]::FromMilliseconds($ms))
@@ -296,12 +296,16 @@ $wa = [System.Windows.SystemParameters]::WorkArea
 $script:anchor = @{ right = $wa.Right - 16; bottom = $wa.Bottom - 4 }
 $script:muted = $false; $script:voiceName = "cc_bright"   # a voice.py preset or Kokoro voice, or a "Microsoft ..." Windows voice
 $script:voiceChosen = $false   # true once you pick a voice in the menu
+$script:bodyChosen = $false; $script:peekChosen = $false   # the same for the colour and auto-hide: until then the config says
+$script:ccName = "cc"
 $script:size = 0.65   # cc's scale; the bubble and chat keep their size
 $script:bodyVariant = "charcoal"   # the board's colour variations; the pony keeps the state colours
 $script:peekAfter = 3                # minutes without you before cc hides on the screen's side; 0 = never
 try {
   $sc = Get-Content (Join-Path $Root "studio.config.json") -Raw -ErrorAction Stop | ConvertFrom-Json
   if ($sc.assistant.voice) { $script:voiceName = $sc.assistant.voice }
+  if ($sc.assistant.color) { $script:bodyVariant = $sc.assistant.color }
+  if ($sc.assistant.name) { $script:ccName = $sc.assistant.name }
   if ($null -ne $sc.assistant.autoHideMinutes) { $script:peekAfter = [int]$sc.assistant.autoHideMinutes }
 } catch {}
 if (Test-Path $PosFile) {
@@ -311,11 +315,12 @@ if (Test-Path $PosFile) {
         if ($null -ne $p.muted) { $script:muted = [bool]$p.muted }
         if ($p.voice -and $p.voiceChosen) { $script:voiceName = $p.voice; $script:voiceChosen = $true }
         if ($p.size -ge 0.4 -and $p.size -le 1) { $script:size = [double]$p.size }
-        if ($p.body) { $script:bodyVariant = $p.body }
-        if ($null -ne $p.peek) { $script:peekAfter = [int]$p.peek } } catch {}
+        if ($p.body -and $p.bodyChosen) { $script:bodyVariant = $p.body; $script:bodyChosen = $true }
+        if ($null -ne $p.peek -and $p.peekChosen) { $script:peekAfter = [int]$p.peek; $script:peekChosen = $true } } catch {}
 }
+$el.NameText.Text = $script:ccName; $win.Title = $script:ccName
 function Save-Settings {
-  @{ right = $script:anchor.right; bottom = $script:anchor.bottom; muted = $script:muted; voice = $script:voiceName; voiceChosen = $script:voiceChosen; size = $script:size; body = $script:bodyVariant; peek = $script:peekAfter } | ConvertTo-Json | Set-Content $PosFile
+  @{ right = $script:anchor.right; bottom = $script:anchor.bottom; muted = $script:muted; voice = $script:voiceName; voiceChosen = $script:voiceChosen; size = $script:size; body = $script:bodyVariant; bodyChosen = $script:bodyChosen; peek = $script:peekAfter; peekChosen = $script:peekChosen } | ConvertTo-Json | Set-Content $PosFile
 }
 # The avatar is drawn at 300 x 276; in those units the body is centred at x 117 and the pony's
 # tip, at its highest, is 262 above the bottom. cc is centred in the stage and the bubble sits on its halo.
@@ -1234,7 +1239,7 @@ $miSide    = Add-Item "Hide on the side" { if ($el.Panel.Visibility -eq "Visible
 $miAuto    = Add-Item "Auto-hide" {}
 foreach ($m in @(@("Off", 0), @("After 1 minute", 1), @("After 3 minutes", 3), @("After 10 minutes", 10))) {
   $ai = New-Object System.Windows.Controls.MenuItem; $ai.Header = $m[0]; $ai.Tag = $m[1]; $ai.IsCheckable = $true
-  $ai.Add_Click({ $script:peekAfter = [int]$this.Tag; Save-Settings; Log "info" "auto-hide set to $($this.Tag) min" })
+  $ai.Add_Click({ $script:peekAfter = [int]$this.Tag; $script:peekChosen = $true; Save-Settings; Log "info" "auto-hide set to $($this.Tag) min" })
   [void]$miAuto.Items.Add($ai)
 }
 $menu.Add_Opened({ foreach ($ai in $miAuto.Items) { $ai.IsChecked = ([int]$ai.Tag -eq $script:peekAfter) } })
@@ -1256,7 +1261,7 @@ foreach ($v in @(@("cc: cute and chill", "cc_chill"), @("cc: cute and bright", "
 $miBody = New-Object System.Windows.Controls.MenuItem; $miBody.Header = "Colour"
 foreach ($b in "Charcoal", "Snow", "Sky", "Mint", "Lavender", "Pink", "Peach", "Yellow") {
   $bi = New-Object System.Windows.Controls.MenuItem; $bi.Header = $b; $bi.Tag = $b.ToLower(); $bi.IsCheckable = $true
-  $bi.Add_Click({ $script:bodyVariant = $this.Tag; Set-Layer "Body" "body_$($this.Tag)"; Set-EyeColor; Save-Settings; Log "info" "colour set to $($this.Tag)" })
+  $bi.Add_Click({ $script:bodyVariant = $this.Tag; $script:bodyChosen = $true; Set-Layer "Body" "body_$($this.Tag)"; Set-EyeColor; Save-Settings; Log "info" "colour set to $($this.Tag)" })
   [void]$miBody.Items.Add($bi)
 }
 [void]$menu.Items.Insert($menu.Items.IndexOf($miVoice) + 1, $miBody)

@@ -50,14 +50,19 @@ npm install
 npm run setup
 ```
 
-The setup wizard asks about your projects (brand, what videos may and may never claim, the
-call to action) and their accounts (platform, handle, posting times, automatic or manual),
-connects Telegram and ElevenLabs if you want them, and then offers to:
+Setup opens in your browser as a chat with cc (a page served from your own computer at
+`localhost:4829`). cc starts with itself: its name, colour, voice and when it hides. Then it
+asks about your projects (brand, what videos may and may never claim, the call to action) and
+their accounts (platform, handle, posting times, automatic or manual), connects Telegram and
+ElevenLabs if you want them, checks your Python, and saves. Last, each of these is a button
+that runs right there, with its output shown live:
 
 1. log in to each account (a Chrome window opens; you log in by hand, nothing is typed for you),
 2. build cc's avatar and install its offline voice,
 3. register the scheduled jobs,
 4. run a health check (`npm run doctor`).
+
+Prefer the terminal? `npm run setup:cli` asks the same questions there (and takes piped answers).
 
 Then put real material in your project's workspace (`workspaces/<project>/assets`: logos,
 screenshots, screen recordings, photos) and fill in `content/CONTEXT.md` (audience, search

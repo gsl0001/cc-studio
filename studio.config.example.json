@@ -2,6 +2,7 @@
   "assistant": {
     "name": "cc",
     "voice": "cc_bright",
+    "color": "charcoal",
     "autoHideMinutes": 3
   },
   "models": {

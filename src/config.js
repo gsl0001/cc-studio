@@ -19,6 +19,7 @@ export const DEFAULTS = {
   assistant: {
     name: "cc",                     // what the desktop assistant calls itself
     voice: "cc_bright",             // a scripts/voice.py preset or any Kokoro voice
+    color: "charcoal",              // cc's body: charcoal, snow, sky, mint, lavender, pink, peach or yellow
     autoHideMinutes: 3,             // cc hides on the screen's side after this long without you; 0 = never
   },
   models: {
