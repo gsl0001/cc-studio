@@ -13,6 +13,7 @@ import { db, log, TERMINAL } from "../src/db.js";
 import { lifecycle, note } from "../src/log.js";
 import { loadRegistry, parseKey, nextSlot } from "../src/registry.js";
 import { PLATFORM_GAP_MINUTES } from "../src/platforms/common.js";
+import { isDayOff } from "../src/daysoff.js";
 
 const SPAWN_DEADLINE_MS = 5 * 60_000;   // refuse to start a child this late into the tick
 const CHILD_TIMEOUT_MS = 30 * 60_000;   // must exceed publish.js's 13-min content-check wait
@@ -75,9 +76,9 @@ for (const a of active) {
       job = cand; break;
     }
     const slot = db.prepare("SELECT scheduled_for s FROM jobs WHERE key=?").get(cand.key)?.s ?? "";
-    if (!slot || onDay(a.id, slot.slice(0, 10)) < a.slots.length) { job = cand; break; }
+    if (!slot || (onDay(a.id, slot.slice(0, 10)) < a.slots.length && !isDayOff(slot.slice(0, 10)))) { job = cand; break; }
     const moved = reslotToFreeDay(a, cand.key, slot);
-    console.log(`move ${cand.key.padEnd(34)} ${slot.slice(0, 10)} is full -> ${moved ?? "no free day in 14"}`);
+    console.log(`move ${cand.key.padEnd(34)} ${slot.slice(0, 10)} is ${isDayOff(slot.slice(0, 10)) ? "a day off" : "full"} -> ${moved ?? "no free day in 14"}`);
     if (moved) { job = cand; break; }
   }
   if (!job) continue;

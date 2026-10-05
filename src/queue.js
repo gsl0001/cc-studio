@@ -6,6 +6,7 @@
 // one hand-written BOM killed two days of posts) and staged in queue/.tmp-<key>/,
 // then renamed into place, so a publish run can never see a half-written job.
 import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
+import { isDayOff } from "./daysoff.js";
 import path from "node:path";
 import { db, log } from "./db.js";
 import { loadRegistry, accountFor, parseKey, nextSlot } from "./registry.js";
@@ -94,7 +95,7 @@ if (account.can_schedule) {
     const pad = (n) => String(n).padStart(2, "0");
     planned = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
   }
-  slot = planned && new Date(planned) > new Date(Date.now() + 30 * 60_000) && !taken.has(planned) ? planned : nextSlot(account, { after, taken });
+  slot = planned && new Date(planned) > new Date(Date.now() + 30 * 60_000) && !taken.has(planned) && !isDayOff(planned.slice(0, 10)) ? planned : nextSlot(account, { after, taken });
   if (slot) writeFileSync(path.join(tmp, "schedule.json"), JSON.stringify({ scheduled_for: slot }) + "\n", "utf8");
 }
 

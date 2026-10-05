@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { db, log } from "../../src/db.js";
 import { loadRegistry } from "../../src/registry.js";
+import { isDayOff } from "../../src/daysoff.js";
 import { launch } from "../../src/browser.js";
 import { notify } from "../../src/telegram.js";
 import { nextWeek, isoWeekId } from "../src/schema.js";
@@ -149,7 +150,9 @@ const busyFrom = (plans) => plans.flatMap((p) => p.posts).filter((p) => p.status
   .map((p) => ({ day: p.day, post_at: p.post_at, key: p.key }));
 const groups = groupAccounts(accounts, styles);
 const inventory = Object.fromEntries(brands.map((pid) => [pid, visualInventory(pid)]));
-const base = { projects, briefs, research, styles, days: week.days, recentHooks: hooks, week: week.id, recentPosts: recent, experiments, inventory };
+// Days off get no posts: the plan and its checks only see the posting days.
+const postDays = week.days.filter((d) => !isDayOff(d));
+const base = { projects, briefs, research, styles, days: postDays, recentHooks: hooks, week: week.id, recentPosts: recent, experiments, inventory };
 const plans = [];
 const failedGroups = [];
 for (const [group, members] of groups) {
@@ -166,7 +169,7 @@ if (!plans.length) await fail(`no group could be planned — ${failedGroups.join
 
 // 4. Validate; one repair pass for every account-day without a valid post.
 const pinned = new Map(reg.accounts.filter((a) => a.post_time).map((a) => [a.id, a.post_time]));
-const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: week.days, fixed, pinned };
+const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: postDays, fixed, pinned };
 let checked = validateWeek(plans, vctx).plans;
 for (const [group, members] of groups) {
   const gaps = validateWeek(checked, vctx).gaps.filter((g) => members.some((m) => m.id === g.account));

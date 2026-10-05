@@ -7,6 +7,7 @@
 // parses off the END — unambiguous even when the id itself contains hyphens or a
 // platform token (instagram-tips-tiktok-2026-09-01-001 -> instagram-tips-tiktok).
 import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { isDayOff } from "./daysoff.js";
 
 const KEY_RE = /^(.+)-(\d{4}-\d{2}-\d{2})-(\d{3})$/;
 
@@ -112,6 +113,7 @@ export function nextSlot(account, { after = new Date(), taken = new Set() } = {}
     // Calendar days, not 24 h steps: a clock change must not skip or repeat a date.
     const d = new Date(after.getFullYear(), after.getMonth(), after.getDate() + day, 12);
     const date = d.toLocaleDateString("sv");
+    if (isDayOff(date)) continue;
     for (const hhmm of [...account.slots].sort()) {
       const at = `${date}T${hhmm}`;
       if (new Date(at) > after && !taken.has(at)) return at;

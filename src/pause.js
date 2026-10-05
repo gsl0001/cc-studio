@@ -52,7 +52,7 @@ if (import.meta.filename === process.argv[1]) {
   assert.deepEqual(pauseEnd("until monday", mon), new Date(2026, 9, 12, 8, 0), "a named day is the next one, never today");
   assert.deepEqual(pauseEnd("until tomorrow", mon), new Date(2026, 9, 6, 8, 0));
   assert.deepEqual(pauseEnd("until 2026-10-20", mon), new Date(2026, 9, 20, 8, 0));
-  assert.equal(pauseEnd("gola windows", mon), null);
+  assert.equal(pauseEnd("acme desk", mon), null);
   assert.equal(pauseEnd("until mo", mon), null);
   console.log("pause ok");
 }

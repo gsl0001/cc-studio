@@ -176,6 +176,12 @@ The better the material, the better the videos:
 | `publish now`, `check logins` | uploads due videos now, checks every account is still logged in |
 | `pause`, `resume` (or `pause <account>`) | stops or restarts everything, or one account |
 | `pause for 3 days`, `pause until Thursday` | pauses now and starts again on its own, with a Telegram message when it does |
+| `retry <account>` | starts a failed upload over |
+| `move Friday's <account> post to Saturday 6pm` | moves one video that isn't uploaded yet |
+| `cancel <account> Oct 10` | drops one video from the queue (asks first; the file stays) |
+| `caption for <account> Friday: <new caption>` | changes a caption before upload (`caption for <account> Friday` reads it) |
+| `show me Friday's videos` | plays a queued video, or lists them as buttons |
+| `no posts on Sundays`, `skip Oct 12`, `days off`, `post on Sundays again` | days off: nothing is planned or posted on them, and queued videos move to the next free day |
 | `folders`, `open <folder>` | opens the finished videos, a project's workspace, the week plans, the calendar or the latest report |
 | `post at 5pm` (or `post at 5pm for <account>`, `posting time auto`) | sets the daily posting time, after you confirm |
 | `mute`, `size small`, `hide` | cc itself |

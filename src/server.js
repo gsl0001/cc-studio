@@ -13,6 +13,7 @@ import { lifecycle, note, readLog } from "./log.js";
 import { ROOT, config, model, projectWorkspace, rootPath } from "./config.js";
 import { loadRegistry } from "./registry.js";
 import { niceWhen, pause, pauseEnd, pausedUntil } from "./pause.js";
+import { dayIn, describeOff, daysOff, isDayOff, matches, niceDay, postDay, postRef, saveDaysOff, weekdayIn, weekdayName } from "./controls.js";
 import { decide, nextVideo, resolveHandoff } from "../scripts/posts.mjs";
 import { creatorRunning, nextPost } from "../scripts/creator.mjs";
 import { nextWeek, isoWeekId } from "../auto_content_pipeline/src/schema.js";
@@ -280,6 +281,33 @@ function widgetState() {
 }
 
 const runTask = (name) => spawnSync("schtasks", ["/run", "/tn", name], { encoding: "utf8", windowsHide: true });
+// Moves a video not uploaded yet to `at` ("YYYY-MM-DDTHH:MM"): the job, its schedule.json,
+// its plan file and the week post it came from all follow.
+function moveJob(key, at) {
+  db.prepare("UPDATE jobs SET scheduled_for=? WHERE key=?").run(at, key);
+  const sf = join("queue", key, "schedule.json");
+  if (existsSync(sf)) writeFileSync(sf, JSON.stringify({ scheduled_for: at }) + "\n");
+  const pf = `plans/${key}.json`;
+  if (!existsSync(pf)) return;
+  const pj = JSON.parse(readFileSync(pf, "utf8").replace(/^\uFEFF/, ""));
+  pj.post_at = at.slice(11, 16);
+  writeFileSync(pf, JSON.stringify(pj, null, 2));
+  const row = pj.week_post && db.prepare("SELECT plan_json FROM week_plans WHERE key=?").get(pj.week_post);
+  if (row) { const wp = JSON.parse(row.plan_json); wp.post_at = pj.post_at; db.prepare("UPDATE week_plans SET post_at=?, plan_json=? WHERE key=?").run(pj.post_at, JSON.stringify(wp), pj.week_post); }
+}
+// The first day after `from` that isn't a day off and has no post of this account (`takenDays`),
+// at the account's posting time.
+function freeDayAfter(account, from, takenDays) {
+  const time = account.post_time ?? from.slice(11, 16) ?? [...account.slots].sort()[0];
+  const d = new Date(`${from.slice(0, 10)}T12:00`);
+  for (let i = 0; i < 21; i++) {
+    d.setDate(d.getDate() + 1);
+    const day = d.toLocaleDateString("sv");
+    if (!isDayOff(day) && !takenDays.has(day)) return `${day}T${time}`;
+  }
+  return null;
+}
+
 // "5pm", "5 pm", "5:30pm", "17:00", "5" (afternoon is assumed for 1-7 without am/pm) -> "HH:MM".
 function clockTime(s) {
   const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?$/.exec(String(s).trim().replace(/\.$/, ""));
@@ -366,6 +394,89 @@ function doAct({ action, key, cut, feedback, time, until }) {
                 ON CONFLICT(account) DO UPDATE SET paused=excluded.paused`).run(key, paused);
     log(null, "account_paused", `${key} paused=${paused} (desk)`);
     return { ok: true, message: paused ? `${accountName(key)} is paused: no new videos or uploads for it until you resume it.` : `${accountName(key)} is back on.` };
+  }
+  // Per-post actions. Keys come from the request but only ever select rows: every one is
+  // checked against the database, and paths come from the key, never from the request.
+  const jobRow = (k) => db.prepare("SELECT key, account, status, scheduled_for FROM jobs WHERE key=?").get(k);
+  const keys = String(key ?? "").split(",").filter(Boolean);
+  const say = (j) => `${accountName(j.account)} ${niceDay(postDay(j))}`;
+  if (action === "retry_upload") {
+    const done = [];
+    for (const k of keys) {
+      const j = jobRow(k);
+      if (j?.status !== "FAILED") continue;
+      db.prepare("UPDATE jobs SET status='PLANNED', attempts=0, error=NULL, claimed_at=NULL, updated_at=datetime('now') WHERE key=?").run(k);
+      log(k, "retry_requested", "desk: attempts reset");
+      done.push(say(j));
+    }
+    if (!done.length) return { error: "nothing to retry: those uploads aren't failed" };
+    const paused = existsSync(STOP_FILE);
+    if (!paused) runTask("cc-studio tick");
+    return { ok: true, message: `Retrying ${done.join(", ")}${paused ? ` when the pause ends${pausedUntil() ? ` (${niceWhen(pausedUntil())})` : ""}` : ": the upload run starts now"}.` };
+  }
+  if (action === "move_post") {
+    const j = jobRow(keys[0]);
+    if (!j || !["PLANNED", "FAILED"].includes(j.status)) return { error: "that post is uploaded already or gone" };
+    if (!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(time ?? "")) return { error: "say a day and a time" };
+    if (new Date(time).getTime() < Date.now() + 30 * 60_000) return { error: "pick a time at least half an hour from now" };
+    if (isDayOff(time.slice(0, 10))) return { error: `${niceDay(time.slice(0, 10))} is a day off` };
+    const clash = db.prepare("SELECT key FROM jobs WHERE account=? AND key<>? AND substr(scheduled_for,1,10)=? AND status NOT IN ('ARCHIVED','FAILED_PERMANENT')")
+      .get(j.account, j.key, time.slice(0, 10));
+    if (clash) return { error: `${accountName(j.account)} already has a post on ${niceDay(time.slice(0, 10))} (one a day). Move that one first, or pick another day.` };
+    moveJob(j.key, time);
+    log(j.key, "moved", `${j.scheduled_for} -> ${time} (desk)`);
+    return { ok: true, message: `Moved ${accountName(j.account)}'s post to ${niceDay(time.slice(0, 10))} at ${nice12(time.slice(11))}.` };
+  }
+  if (action === "cancel_post") {
+    const done = [];
+    for (const k of keys) {
+      const j = jobRow(k);
+      if (!j || !["PLANNED", "FAILED"].includes(j.status)) continue;
+      db.prepare("UPDATE jobs SET status='ARCHIVED', error='cancelled from the desk', updated_at=datetime('now') WHERE key=?").run(k);
+      log(k, "cancelled", "desk");
+      done.push(say(j));
+    }
+    return done.length ? { ok: true, message: `Cancelled ${done.join(", ")}. The video${done.length > 1 ? "s stay" : " stays"} in the queue folder.` } : { error: "nothing to cancel: those are uploaded already or gone" };
+  }
+  if (action === "set_caption") {
+    const j = jobRow(keys[0]), text = String(feedback ?? "").trim();
+    if (!j || !["PLANNED", "FAILED"].includes(j.status)) return { error: "that post is uploaded already or gone" };
+    if (!text) return { error: "the caption is empty" };
+    if (text.length > 2200) return { error: `that's ${text.length} characters; TikTok allows 2200` };
+    const f = join("queue", j.key, "caption.txt");
+    if (existsSync(f)) writeFileSync(`${f}.bak`, readFileSync(f));
+    writeFileSync(f, text + "\n");
+    log(j.key, "caption_edited", "desk");
+    return { ok: true, message: `New caption for ${say(j)}:\n${text}` };
+  }
+  if (action === "watch") {
+    const j = jobRow(keys[0]);
+    const file = j && [db.prepare("SELECT video_path v FROM jobs WHERE key=?").get(j.key)?.v, join("queue", j.key, "final.mp4")].find((p) => p && existsSync(p));
+    if (!file) return { error: "I can't find that video file" };
+    spawn("explorer", [resolve(file)], { detached: true, windowsHide: true }).unref();
+    return { ok: true, message: `Playing ${say(j)}.` };
+  }
+  if (action === "days_off") {
+    const off = daysOff(), add = feedback !== "remove", wd = /^weekday:([0-6])$/.exec(time ?? "");
+    if (!wd && !/^\d{4}-\d{2}-\d{2}$/.test(time ?? "")) return { error: "say a weekday or a date" };
+    const list = wd ? off.weekdays : off.dates, value = wd ? Number(wd[1]) : time;
+    if (add && !list.includes(value)) list.push(value);
+    if (!add && list.includes(value)) list.splice(list.indexOf(value), 1);
+    saveDaysOff(off);
+    const what = wd ? weekdayName(value) : niceDay(value);
+    log(null, "days_off", `${add ? "added" : "removed"} ${what} (desk)`);
+    if (!add) return { ok: true, message: `${what} ${wd ? "are" : "is"} a posting day again.` };
+    // Videos not uploaded yet on a day off move to the next free day; uploaded ones are TikTok's.
+    const moved = [], stuck = [];
+    for (const j of db.prepare("SELECT key, account, status, scheduled_for FROM jobs WHERE status IN ('PLANNED','FAILED','SCHEDULED') AND scheduled_for > ?").all(new Date().toISOString().slice(0, 16))) {
+      if (!isDayOff(postDay(j))) continue;
+      if (j.status === "SCHEDULED") { stuck.push(say(j)); continue; }
+      const account = loadRegistry().accounts.find((a) => a.id === j.account);
+      const taken = new Set(db.prepare("SELECT scheduled_for s FROM jobs WHERE account=? AND key<>? AND scheduled_for IS NOT NULL AND status NOT IN ('ARCHIVED')").all(j.account, j.key).map((x) => x.s.slice(0, 10)));
+      const at = account && freeDayAfter(account, j.scheduled_for, taken);
+      if (at) { moveJob(j.key, at); log(j.key, "moved", `${j.scheduled_for} -> ${at} (day off)`); moved.push(`${say(j)} -> ${niceDay(at.slice(0, 10))}`); }
+    }
+    return { ok: true, message: `No posts on ${what} from now on.${moved.length ? `\nMoved: ${moved.join("; ")}.` : ""}${stuck.length ? `\nAlready scheduled on TikTok for that day (change them in TikTok Studio): ${stuck.join(", ")}.` : ""}` };
   }
   if (action === "post_time") return setPostTime(time ?? null, key ?? null);
   if (action === "check") {
@@ -545,6 +656,91 @@ function quick(text, st) {
       : `Post ${whom} at ${nice12(time)} every day? Videos not uploaded yet move to ${nice12(time)}; ones already scheduled on TikTok keep their time.`,
       suggest: { action: "post_time", time, key: id ?? undefined, label: time === "auto" ? "Yes, pick automatically" : `Yes, ${nice12(time)}` } };
   }
+  // Per-post controls on videos not uploaded yet (once TikTok has a post, it's TikTok's):
+  // retry, move, cancel, caption, watch; plus days off. Words become a post through postRef.
+  const posts = (statuses) => db.prepare(`SELECT key, account, status, scheduled_for FROM jobs
+    WHERE status IN (${statuses.map(() => "?").join(",")}) ORDER BY scheduled_for`).all(...statuses);
+  const PENDING = ["PLANNED", "FAILED"];
+  const label = (j) => `${accountName(j.account)} ${niceDay(postDay(j))}${j.scheduled_for ? ` at ${nice12(j.scheduled_for.slice(11, 16))}` : ""}`;
+  const listOf = (js) => js.map((j) => `- ${label(j)}`).join("\n");
+  const ref = (words) => postRef(words ?? "", Object.fromEntries(accountIds().map((id) => [id, accountName(id)])));
+  const named = (r) => r.account || r.date;
+  const pendingOne = (r, verb) => {   // exactly one post not uploaded yet, or the reply saying why not
+    const js = posts(PENDING).filter((j) => matches(j, r));
+    if (js.length === 1) return { job: js[0] };
+    if (js.length) return { reply: `That matches ${js.length} posts; name the account and the day:\n${listOf(js)}` };
+    const up = posts(["SCHEDULED"]).filter((j) => matches(j, r));
+    return { reply: up.length ? `${up.length === 1 ? `${label(up[0])} is` : `${up.length} of those are`} already scheduled on TikTok, so ${verb} it in TikTok Studio.` : "No post that isn't uploaded yet matches that." };
+  };
+  const weekdayPlural = (s) => /^(?:every\s+)?(sun|mon|tue|wed|thu|fri|sat)[a-z]*day(s?)$/.exec(s.trim());
+
+  let m = /^retry(?:\s+(?:the\s+)?(?:stuck\s+|failed\s+)?(?:uploads?\s*|posts?\s*)?(.*))?$/.exec(w);
+  if (m) {
+    const r = ref(m[1]), all = posts(["FAILED"]), failed = all.filter((j) => matches(j, r));
+    if (failed.length) return { reply: "", run: { action: "retry_upload", key: failed.map((j) => j.key).join(",") } };
+    return { reply: all.length ? `None of the failed uploads match that. Failed now:\n${listOf(all)}` : "No uploads have failed." };
+  }
+  m = /^(?:move|reschedule|shift)\s+(.+?)\s+to\s+(.+)$/.exec(w);
+  if (m) {
+    const r = ref(m[1]);
+    if (!named(r)) return { reply: `Which post? Say it like "move Friday's Acme post to Saturday 6pm".` };
+    const one = pendingOne(r, "move");
+    if (!one.job) return { reply: one.reply };
+    const to = dayIn(m[2]), at = to.rest.replace(/^at\s+/, "");
+    const time = at ? clockTime(at) : one.job.scheduled_for?.slice(11, 16);
+    if (!time) return { reply: `I didn't catch the time in "${m[2]}". Try "to Saturday 6pm" or "to Oct 12 at 17:30".` };
+    return { reply: "", run: { action: "move_post", key: one.job.key, time: `${to.date ?? postDay(one.job)}T${time}` } };
+  }
+  m = /^(?:cancel|delete|drop)\s+(.+)$/.exec(w);
+  if (m && !/^(the\s+)?(pause|days? off)/.test(m[1])) {
+    const r = ref(m[1]);
+    if (!named(r)) return { reply: `Which post? Say it like "cancel Notes Oct 10".` };
+    const js = posts(PENDING).filter((j) => matches(j, r));
+    if (!js.length) return { reply: pendingOne(r, "cancel").reply };
+    return { reply: `Cancel ${js.length === 1 ? "this post" : `these ${js.length} posts`}? The video stays in its folder; it just won't be uploaded.\n${listOf(js)}`,
+      suggest: { action: "cancel_post", key: js.map((j) => j.key).join(","), label: `Yes, cancel ${js.length === 1 ? "it" : `all ${js.length}`}` } };
+  }
+  m = /^(?:(?:change|edit|set|new)\s+(?:the\s+)?)?caption\s+(?:for\s+|of\s+|on\s+)?(.+?)\s*:\s*([\s\S]+)$/i.exec(t);
+  if (m) {
+    const one = pendingOne(ref(m[1]), "edit");
+    return one.job ? { reply: "", run: { action: "set_caption", key: one.job.key, feedback: m[2].trim() } } : { reply: one.reply };
+  }
+  m = /^(?:(?:show|what'?s|read)\s+(?:me\s+)?(?:the\s+)?)?caption\s+(?:for\s+|of\s+|on\s+)?(.+)$/.exec(w);
+  if (m) {
+    const js = posts([...PENDING, "SCHEDULED"]).filter((j) => matches(j, ref(m[1])));
+    if (js.length !== 1) return { reply: js.length ? `That matches ${js.length} posts; name the account and the day:\n${listOf(js)}` : "No post matches that." };
+    const f = join("queue", js[0].key, "caption.txt");
+    return { reply: `${label(js[0])}:\n${existsSync(f) ? readFileSync(f, "utf8").trim() : "(no caption file)"}${PENDING.includes(js[0].status) ? `\n\nTo change it, say: caption for ${accountName(js[0].account)} ${postDay(js[0])}: your new caption` : ""}` };
+  }
+  m = /^(?:show|watch|play|see|preview)(?:\s+me)?\s+(.+)$/.exec(w);
+  if (m && !folderFrom(m[1].replace(/\s+folder$/, ""))) {
+    const r = ref(m[1]);
+    if (named(r) || /\b(videos?|posts?|queued|upcoming|scheduled)\b/.test(m[1])) {
+      const today = new Date().toLocaleDateString("sv");
+      const js = posts([...PENDING, "SCHEDULED"]).filter((j) => matches(j, r) && postDay(j) >= today);
+      if (!js.length) return { reply: `No upcoming videos${named(r) ? " match that" : ""}.` };
+      if (js.length === 1) return { reply: "", run: { action: "watch", key: js[0].key } };
+      return { reply: `${js.length} videos:\n${listOf(js)}\nTap one to watch it.`, chips: js.slice(0, 8).map((j) => `watch ${accountName(j.account)} ${postDay(j)}`) };
+    }
+  }
+  if (/^(days? off|what days? off|show (my )?days? off|which days (are|do i have) off)$/.test(w)) {
+    const off = describeOff();
+    return { reply: off.length ? `No posts on: ${off.join(", ")}.\nSay "post on Sundays again" or "unskip Oct 12" to change it.` : `No days off. Say "no posts on Sundays" or "skip Oct 12".` };
+  }
+  // "no posts on Sundays" (plural or "every": the weekday), "skip Friday" / "skip Oct 12" (one date).
+  m = /^(?:no posts?|don'?t post|do not post|skip|day off)\s+(?:on\s+)?(.+?)$/.exec(w);
+  if (m && !ref(m[1]).account) {
+    const wd = weekdayPlural(m[1]), d = dayIn(m[1]).date;
+    if (wd && (wd[2] || /^every/.test(m[1].trim()))) return { reply: "", run: { action: "days_off", feedback: "add", time: `weekday:${weekdayIn(wd[1])}` } };
+    if (d) return { reply: "", run: { action: "days_off", feedback: "add", time: d } };
+  }
+  m = /^(?:post on|posts on|unskip|resume posting on|remove (?:the )?day off(?: on)?)\s+(.+?)(?:\s+again)?$/.exec(w);
+  if (m) {
+    const wd = weekdayPlural(m[1]), d = dayIn(m[1]).date;
+    if (d && daysOff().dates.includes(d)) return { reply: "", run: { action: "days_off", feedback: "remove", time: d } };
+    if (wd) return { reply: "", run: { action: "days_off", feedback: "remove", time: `weekday:${weekdayIn(wd[1])}` } };
+    if (d) return { reply: `${niceDay(d)} isn't a day off.` };
+  }
   // "pause for 3 days", "pause until thursday": pause now, resume on its own (the pulse lifts it).
   const timed = /^pause(?:\s+(?:everything|all|it all))?\s+(.+)$/.exec(w), until = timed && pauseEnd(timed[1]);
   if (until) return { reply: "", run: { action: "pause", until: until.toISOString() } };
@@ -587,6 +783,9 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
 - publish now, check logins, run a pulse, restart bot
 - pause or resume everything, or one account: pause and its name
 - pause for a while and resume on its own: pause for 3 days, pause until Thursday
+- one post: retry Acme Desk, move Friday's Acme post to Saturday 6pm, cancel Notes Oct 10,
+  caption for <account> Friday: new caption, show me Friday's videos
+- days off: no posts on Sundays, skip Oct 12, days off, post on Sundays again
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;
@@ -644,7 +843,7 @@ If the user wants something done, add ONE line: ACTION: {"action":"...","key":".
 using one of: ${ACTIONS.join(", ")} (approve/skip/redo need the key and cut of a video waiting
 for review; redo needs feedback; next may take an account id as key to make that account's
 next post; pause_account/resume_account need an account id (${accountIds().join(", ")});
-pause may take "until":"<ISO time>" to resume on its own then (the user says "pause for 3 days" or "until Thursday"; resolve it from NOW); post_time sets the daily posting time: "time":"HH:MM" (24 h) or "auto", with an account id as
+For one post (retry a failed upload, move, cancel, change its caption, watch it) or days off, don't use ACTION: tell the user the exact words to type, e.g. "retry Acme Desk", "move Friday's Acme post to Saturday 6pm", "cancel Notes Oct 10", "caption for Acme Friday: <text>", "show me Friday's videos", "no posts on Sundays", "skip Oct 12". pause may take "until":"<ISO time>" to resume on its own then (the user says "pause for 3 days" or "until Thursday"; resolve it from NOW); post_time sets the daily posting time: "time":"HH:MM" (24 h) or "auto", with an account id as
 key for just one account (posts already scheduled on TikTok keep their time; never use redo for
 times, redo only remakes a video waiting for review); check runs the login check; open needs one of these keys: ${FOLDERS.map((f) => f.key).join(", ")}; retry/posted need
 the key of an upload that needs a human). It becomes a button the user taps; say what it will do.

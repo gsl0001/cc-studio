@@ -348,7 +348,9 @@ async function configureSchedule(page, job, scheduledFor) {
   // The grid also shows the neighbouring months' days: last month's 23-31 before day 1 and
   // next month's 1-6 after the last day. So an early date is the FIRST match and a late one
   // the LAST (2026-10-03 review: .last() picked next month's cell for days 1-6).
-  const cellsForDay = page.getByText(String(day), { exact: true });
+  // Not the time picker's hour spans: they are in the page too (hidden), and from day 10 on
+  // "10".."23" matched them first (2026-10-05: every post on the 10th failed 3 times).
+  const cellsForDay = page.getByText(String(day), { exact: true }).and(page.locator(":not(.tiktok-timepicker-option-text)")).filter({ visible: true });
   await (day <= 15 ? cellsForDay.first() : cellsForDay.last()).click();
   await page.waitForTimeout(900);
 
