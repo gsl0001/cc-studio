@@ -1438,6 +1438,8 @@ $win.Add_Loaded({
   Set-Muted $script:muted
   Say "Hi, I'm cc. Click me to chat, right-click for controls." $true
 })
+# cc has no taskbar button, so Show desktop (Win+D) would leave it minimized with no way back: undo it.
+$win.Add_StateChanged({ if ($win.WindowState -eq "Minimized") { Log "info" "minimized by Windows; coming back"; After 300 { $win.WindowState = "Normal"; $win.Topmost = $true } } })
 $win.Add_Closed({ Log "info" "cc closed"; $player.Close(); $synth.Dispose(); $client.Dispose(); $mutex.ReleaseMutex() })
 $win.Dispatcher.Add_UnhandledException({
   param($sender, $e)
