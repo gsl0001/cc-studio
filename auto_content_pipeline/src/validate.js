@@ -32,7 +32,9 @@ export function postText(p) {
 // visual, and no visual repeats across this run or the last weeks (recentVisuals); one
 // format or pillar carries at most MAX_SAME posts per account; every post is in an arm of
 // the account's experiment.
-export function validateWeek(plans, { projects, recentHooks = [], recentVisuals = [], days, fixed = [] }) {
+// `pinned` maps an account to the posting time you fixed for it (profile post_time): its posts
+// take that time whatever the model picked, and the spacing rule does not apply to them.
+export function validateWeek(plans, { projects, recentHooks = [], recentVisuals = [], days, fixed = [], pinned = new Map() }) {
   const seenHooks = new Set(recentHooks.map(norm));
   const seenVisuals = new Map(recentVisuals.map((v) => [visualId(v), "a recent post"]));
   const taken = [];
@@ -48,7 +50,9 @@ export function validateWeek(plans, { projects, recentHooks = [], recentVisuals 
     const valid = new Map(); // day -> key
     const failed = new Map(); // day -> reasons
     const formats = new Map(), pillars = new Map(); // norm -> count of valid posts
+    const pin = pinned.get(plan.account);
     const posts = plan.posts.map((p) => {
+      if (pin && p.post_at !== pin) p = { ...p, post_at: pin, time_reason: "your fixed posting time" };
       const reasons = postShapeErrors(p);
       if (!reasons.length) {
         const bad = (project?.forbidden_claims ?? []).find((c) => postText(p).includes(c.toLowerCase()));
@@ -58,7 +62,7 @@ export function validateWeek(plans, { projects, recentHooks = [], recentVisuals 
         if (valid.has(p.day)) reasons.push(`second post on ${p.day}`);
         if (p.duration_s < lo || p.duration_s > hi) reasons.push(`duration ${p.duration_s}s outside ${lo}-${hi}s`);
         if (p.hashtags.length > MAX_HASHTAGS) reasons.push(`${p.hashtags.length} hashtags (max ${MAX_HASHTAGS})`);
-        const clash = taken.find((t) => t.day === p.day && Math.abs(t.min - minutes(p.post_at)) < GAP_MINUTES);
+        const clash = !pin && taken.find((t) => t.day === p.day && Math.abs(t.min - minutes(p.post_at)) < GAP_MINUTES);
         if (clash) reasons.push(`within ${GAP_MINUTES} min of ${clash.key}`);
         if (typeof p.visual !== "string" || !norm(p.visual)) reasons.push("visual missing: name the one primary screen, footage or scene");
         else if (seenVisuals.has(visualId(p.visual))) reasons.push(`visual "${p.visual}" already used by ${seenVisuals.get(visualId(p.visual))}: pick a different screen, footage or scene`);

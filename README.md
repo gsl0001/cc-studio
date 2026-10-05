@@ -176,6 +176,7 @@ The better the material, the better the videos:
 | `publish now`, `check logins` | uploads due videos now, checks every account is still logged in |
 | `pause`, `resume` (or `pause <account>`) | stops or restarts everything, or one account |
 | `folders`, `open <folder>` | opens the finished videos, a project's workspace, the week plans, the calendar or the latest report |
+| `post at 5pm` (or `post at 5pm for <account>`, `posting time auto`) | sets the daily posting time, after you confirm |
 | `mute`, `size small`, `hide` | cc itself |
 | `help` | all of the above as buttons |
 

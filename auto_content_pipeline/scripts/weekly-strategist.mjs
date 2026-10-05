@@ -165,7 +165,8 @@ for (const [group, members] of groups) {
 if (!plans.length) await fail(`no group could be planned — ${failedGroups.join("; ")}`);
 
 // 4. Validate; one repair pass for every account-day without a valid post.
-const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: week.days, fixed };
+const pinned = new Map(reg.accounts.filter((a) => a.post_time).map((a) => [a.id, a.post_time]));
+const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: week.days, fixed, pinned };
 let checked = validateWeek(plans, vctx).plans;
 for (const [group, members] of groups) {
   const gaps = validateWeek(checked, vctx).gaps.filter((g) => members.some((m) => m.id === g.account));

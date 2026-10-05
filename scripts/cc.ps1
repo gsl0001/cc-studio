@@ -499,11 +499,12 @@ function Act($body, $card) {
 function Add-Suggestion($a) {
   $row = New-Object System.Windows.Controls.WrapPanel
   $row.Margin = "0,0,0,8"
-  $label = "Do it: $($a.action)"; if ($a.key) { $label += " $($a.key)" }; if ($a.feedback) { $label += " - `"$($a.feedback)`"" }
+  if ($a.label) { $label = "$($a.label)" }
+  else { $label = "Do it: $($a.action)"; if ($a.key) { $label += " $($a.key)" }; if ($a.feedback) { $label += " - `"$($a.feedback)`"" } }
   $yes = New-Btn $label $true; $no = New-Btn "No" $false
   $yes.Tag = @{ action = $a; row = $row }; $no.Tag = $row
   $yes.Add_Click({ $t = $this.Tag; $el.Feed.Children.Remove($t.row)
-    $body = @{ action = $t.action.action }; foreach ($k in "key","cut","feedback") { if ($t.action.$k) { $body[$k] = $t.action.$k } }
+    $body = @{ action = $t.action.action }; foreach ($k in "key","cut","feedback","time") { if ($t.action.$k) { $body[$k] = $t.action.$k } }
     Act $body $null })
   $no.Add_Click({ $el.Feed.Children.Remove($this.Tag) })
   [void]$row.Children.Add($yes); [void]$row.Children.Add($no)

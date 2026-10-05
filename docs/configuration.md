@@ -75,6 +75,7 @@ One per brand, product or channel. `apps/example/profile.json` is a complete exa
 | `handle` | | The account's handle, without @. |
 | `browser_profile` | `<platform>-<project>` | The Chrome profile folder under `browser-profile/` holding this login. Never share one between brands. |
 | `slots` | `["18:00"]` | Posting times, 24 h, local time. |
+| `post_time` | none | One fixed daily posting time (`"17:00"`): the strategist uses it instead of picking a time from the numbers, and the 45-minute spacing rule doesn't apply. Set it from cc with "post at 5pm" (every account) or "post at 5pm for <account>"; "posting time auto" removes it. |
 | `lead_days` | `0` | How far ahead uploads are scheduled (TikTok allows up to 10 days; 7 is a good value). |
 | `can_schedule` | `true` | Whether the platform's scheduler is used (Instagram via browser: `false`, it posts right away). |
 | `mode` | `"UPLOAD_ONLY"` | `"SCHEDULE"`: upload and schedule; `"UPLOAD_ONLY"`: upload and stop before the final button. |

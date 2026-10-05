@@ -104,6 +104,11 @@ r = validateWeek([goodPlan(), goodPlan({ account: "mybrand-desk-tiktok", posts: 
 assert.ok(r.invalid[0].reasons.some((x) => x.includes(`${GAP_MINUTES} min`)), "siblings 30 min apart clash");
 assert.ok(r.gaps.some((g) => g.account === "mybrand-desk-tiktok" && g.day === "2026-10-05"));
 assert.ok(r.gaps.some((g) => g.account === "mybrand-tiktok" && g.day === "2026-10-06" && g.reasons[0] === "no post planned"));
+// a fixed posting time (profile post_time) overrides the model's pick and the spacing rule
+r = validateWeek([goodPlan(), goodPlan({ account: "mybrand-desk-tiktok", posts: [goodPost({ key: "mybrand-desk-tiktok-2026-10-05-001", post_at: "18:30", hook: { text: "Sibling", first_frame_motion: "m" }, visual: "other" })] })],
+  { ...vctx, pinned: new Map([["mybrand-tiktok", "17:00"], ["mybrand-desk-tiktok", "17:00"]]) });
+assert.strictEqual(r.invalid.length, 0, "pinned siblings at one time are fine");
+assert.deepStrictEqual(r.plans.flatMap((p) => p.posts.map((x) => x.post_at)), ["17:00", "17:00"]);
 // distinctiveness and experiments
 r = run([goodPost(), second({ visual: "Cluttered taskbar recording!" })]);
 assert.ok(r.invalid[0].reasons.some((x) => x.includes("already used by mybrand-tiktok-2026-10-05-001")), "a visual repeats across the plan, wording-blind");

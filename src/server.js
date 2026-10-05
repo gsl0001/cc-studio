@@ -278,12 +278,72 @@ function widgetState() {
 }
 
 const runTask = (name) => spawnSync("schtasks", ["/run", "/tn", name], { encoding: "utf8", windowsHide: true });
+// "5pm", "5 pm", "5:30pm", "17:00", "5" (afternoon is assumed for 1-7 without am/pm) -> "HH:MM".
+function clockTime(s) {
+  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?$/.exec(String(s).trim().replace(/\.$/, ""));
+  if (!m) return null;
+  let h = Number(m[1]); const min = Number(m[2] ?? 0), ap = m[3]?.[0];
+  if (min > 59 || h > 23 || (ap && (h < 1 || h > 12))) return null;
+  if (ap === "p" && h < 12) h += 12;
+  if (ap === "a" && h === 12) h = 0;
+  if (!ap && !m[2] && h >= 1 && h <= 7) h += 12;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+const nice12 = (t) => { const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`; };
+
+// One daily posting time for every account (or one): written to each profile as post_time (the
+// strategist uses it instead of picking) and slots, then the week posts and videos not uploaded
+// yet move to it. Posts already scheduled on the platform are in its hands and keep their time.
+// "auto" removes post_time so the strategist picks from the numbers again.
+function setPostTime(time, only) {
+  if (time !== "auto" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time ?? "")) return { error: "say a time like 5pm or 17:00" };
+  if (only && !accountIds().includes(only)) return { error: `no account called ${only}` };
+  const ids = [];
+  for (const d of readdirSync("apps", { withFileTypes: true }).filter((x) => x.isDirectory() && x.name !== "example" && existsSync(`apps/${x.name}/profile.json`))) {
+    const file = `apps/${d.name}/profile.json`, p = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
+    let changed = false;
+    for (const a of p.accounts ?? []) {
+      if (only && a.id !== only) continue;
+      if (time === "auto") delete a.post_time; else { a.post_time = time; a.slots = [time]; }
+      ids.push(a.id); changed = true;
+    }
+    if (changed) writeFileSync(file, JSON.stringify(p, null, 2) + "\n");
+  }
+  if (time === "auto") {
+    log(null, "post_time", `auto for ${only ?? "every account"} (desk)`);
+    return { ok: true, message: `The strategist picks the times for ${only ? accountName(only) : "every account"} again from next week's plan.` };
+  }
+  const soon = Date.now() + 30 * 60_000, moved = [];
+  const repost = (key) => {   // the week post and its plan file follow
+    const row = db.prepare("SELECT plan_json FROM week_plans WHERE key=?").get(key);
+    if (row) { const pj = JSON.parse(row.plan_json); pj.post_at = time; db.prepare("UPDATE week_plans SET post_at=?, plan_json=? WHERE key=?").run(time, JSON.stringify(pj), key); }
+  };
+  for (const j of db.prepare("SELECT key, account, scheduled_for FROM jobs WHERE status IN ('PLANNED','FAILED') AND scheduled_for IS NOT NULL").all()) {
+    if (!ids.includes(j.account)) continue;
+    const at = `${j.scheduled_for.slice(0, 10)}T${time}`;
+    if (at === j.scheduled_for || new Date(at).getTime() < soon) continue;
+    db.prepare("UPDATE jobs SET scheduled_for=? WHERE key=?").run(at, j.key);
+    const sf = join("queue", j.key, "schedule.json");
+    if (existsSync(sf)) writeFileSync(sf, JSON.stringify({ scheduled_for: at }) + "\n");
+    const pf = `plans/${j.key}.json`;
+    if (existsSync(pf)) { const pj = JSON.parse(readFileSync(pf, "utf8").replace(/^\uFEFF/, "")); repost(pj.week_post ?? j.key); pj.post_at = time; writeFileSync(pf, JSON.stringify(pj, null, 2)); }
+    moved.push(j.key);
+  }
+  for (const r of db.prepare("SELECT key, account FROM week_plans WHERE status IN ('planned','rendered','approved','blocked')").all()) {
+    if (ids.includes(r.account)) repost(r.key);
+  }
+  const scheduled = db.prepare(`SELECT count(*) n FROM jobs WHERE status='SCHEDULED' AND scheduled_for > ? AND account IN (${ids.map(() => "?").join(",")})`)
+    .get(new Date().toISOString().slice(0, 16), ...ids).n;
+  log(null, "post_time", `${time} for ${only ?? "every account"}; moved ${moved.length} not-yet-uploaded videos (desk)`);
+  return { ok: true, message: `Done: ${only ? accountName(only) : "every account"} posts at ${nice12(time)} from now on. I moved ${moved.length} video${moved.length === 1 ? "" : "s"} not uploaded yet.${scheduled ? ` ${scheduled} already scheduled on TikTok keep their old time.` : ""}` };
+}
+
 function widgetAct(a) {
   const r = doAct(a);
   note(r.error ? "warn" : "info", `action ${a.action}${a.key ? ` ${a.key}` : ""}: ${r.message ?? r.error ?? "done"}`.slice(0, 400), a.key ? { key: a.key } : {});
   return r;
 }
-function doAct({ action, key, cut, feedback }) {
+function doAct({ action, key, cut, feedback, time }) {
   if (["approve", "skip", "redo"].includes(action)) {
     if (action === "redo" && !String(feedback ?? "").trim()) return { error: "say what to change" };
     const message = decide(key, action, String(feedback ?? ""), cut ?? null, "the desk");
@@ -305,6 +365,7 @@ function doAct({ action, key, cut, feedback }) {
     log(null, "account_paused", `${key} paused=${paused} (desk)`);
     return { ok: true, message: paused ? `${accountName(key)} is paused: no new videos or uploads for it until you resume it.` : `${accountName(key)} is back on.` };
   }
+  if (action === "post_time") return setPostTime(time ?? null, key ?? null);
   if (action === "check") {
     // The pulse runs the login check with its locks (never during an upload); forget today's.
     rmSync("logs/.authcheck-day", { force: true });
@@ -338,7 +399,7 @@ function doAct({ action, key, cut, feedback }) {
 // state and streams back (cc shows the words as they come and speaks them sentence by
 // sentence). Whatever Claude suggests doing comes back as a button, never a silent action.
 const chatLog = [];   // last few turns, so follow-ups ("and the other one?") have context
-const ACTIONS = ["approve", "skip", "redo", "next", "pause", "resume", "pause_account", "resume_account", "check", "pulse", "tick", "bot", "open", "retry", "posted"];
+const ACTIONS = ["approve", "skip", "redo", "next", "pause", "resume", "pause_account", "resume_account", "check", "pulse", "tick", "bot", "open", "retry", "posted", "post_time"];
 
 // Quick access: every folder the pipeline uses, by the names people say ("open <brand> workspace"),
 // built from studio.config.json and the projects. `find` opens a file selected in its folder
@@ -463,6 +524,20 @@ function quick(text, st) {
     return { reply, speech: `${c.planned} posts are planned and ${c.approved + c.queued} are queued.${st.creator ? ` I'm making ${niceKey(st.creator)} now.` : nx ? ` The next one I'll make is ${niceKey(nx.key)}.` : ""}`,
       chips: ["What's next?", "Open the calendar"] };
   }
+  // "post at 5pm", "change posting times to 17:00 for <account>", "posting time auto": a button to confirm.
+  const pt = /^(?:(?:change|set|move|make)\s+)?(?:the\s+|my\s+|all\s+)?(?:posting|post|upload)\s*times?\s+(?:to\s+|at\s+)?(.+?)(?:\s+(?:every\s*day|daily))?(?:\s+for\s+(.+))?$|^post(?:\s+everything)?\s+at\s+(.+?)(?:\s+(?:every\s*day|daily))?(?:\s+for\s+(.+))?$/.exec(w);
+  if (pt) {
+    const when = pt[1] ?? pt[3], who = pt[2] ?? pt[4];
+    const time = /^(auto|automatic|best|default|off)$/.test(when) ? "auto" : clockTime(when);
+    const id = who ? accountFrom(who) : null;
+    if (who && !id) return { reply: `I don't know an account called "${who}". Try ${accountIds().map(accountName).join(", ")}.` };
+    if (!time) return { reply: `I didn't catch the time in "${when}". Try "post at 5pm" or "post at 17:30".` };
+    const whom = id ? accountName(id) : "every account";
+    return { reply: time === "auto"
+      ? `Let the strategist pick the posting times for ${whom} again, from each account's numbers?`
+      : `Post ${whom} at ${nice12(time)} every day? Videos not uploaded yet move to ${nice12(time)}; ones already scheduled on TikTok keep their time.`,
+      suggest: { action: "post_time", time, key: id ?? undefined, label: time === "auto" ? "Yes, pick automatically" : `Yes, ${nice12(time)}` } };
+  }
   const acct = /^(pause|resume|next|make)\s+(?:a |the )?(?:next )?(?:video )?(?:for )?(.+)$/.exec(w);
   if (acct) {
     const toggle = acct[1] === "pause" || acct[1] === "resume";
@@ -485,8 +560,10 @@ function quick(text, st) {
     if (!only) return { reply: st.review.length ? "More than one video is waiting. Use the buttons on the one you mean." : "Nothing is waiting for review." };
     return { reply: "", run: { action: w === "skip" ? "skip" : "approve", key: only.key, cut: only.cut } };
   }
+  // "change"/"fix" mean Redo only while a video is waiting; otherwise ("change posting times
+  // to 5pm") they're a request for Claude, not a redo with nothing to redo.
   const redo = /^(redo|change|fix)\s*[:,-]?\s*(.+)$/i.exec(t);
-  if (redo) {
+  if (redo && (redo[1].toLowerCase() === "redo" || st.review.length)) {
     if (!only) return { reply: st.review.length ? "More than one video is waiting. Use Redo on the one you mean." : "Nothing is waiting for review." };
     return { reply: "", run: { action: "redo", key: only.key, cut: only.cut, feedback: redo[2] } };
   }
@@ -556,7 +633,9 @@ If the user wants something done, add ONE line: ACTION: {"action":"...","key":".
 using one of: ${ACTIONS.join(", ")} (approve/skip/redo need the key and cut of a video waiting
 for review; redo needs feedback; next may take an account id as key to make that account's
 next post; pause_account/resume_account need an account id (${accountIds().join(", ")});
-check runs the login check; open needs one of these keys: ${FOLDERS.map((f) => f.key).join(", ")}; retry/posted need
+post_time sets the daily posting time: "time":"HH:MM" (24 h) or "auto", with an account id as
+key for just one account (posts already scheduled on TikTok keep their time; never use redo for
+times, redo only remakes a video waiting for review); check runs the login check; open needs one of these keys: ${FOLDERS.map((f) => f.key).join(", ")}; retry/posted need
 the key of an upload that needs a human). It becomes a button the user taps; say what it will do.
 Always end with ONE line of 2 or 3 short follow-up QUESTIONS the user might ask next (questions,
 not commands; actions belong in ACTION): CHIPS: first | second | third
@@ -650,7 +729,7 @@ function chat(text) {
     note("info", "chat answered from a quick command", { q: text.slice(0, 200) });
     chatLog.push({ user: text, bot: r.reply });
     chatLog.splice(0, Math.max(0, chatLog.length - 12));
-    return { done: true, reply: r.reply, speech: r.speech, chips: r.chips ?? [], controls: !!r.controls, folders: !!r.folders };
+    return { done: true, reply: r.reply, speech: r.speech, chips: r.chips ?? [], controls: !!r.controls, folders: !!r.folders, suggest: r.suggest };
   }
   return { id: startDesk(text, st) };
 }
