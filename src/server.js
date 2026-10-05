@@ -611,7 +611,7 @@ function spokenProblems() {
     + `The latest was at ${at}, from ${last.src === "cc" ? "me" : `the ${last.src.replace("-", " ")}`}: ${last.msg.split("\n")[0].slice(0, 160)}. The full list is in the chat.`;
 }
 
-function quick(text, st) {
+function quick(text, st, via = "cc") {
   const t = text.trim(), w = t.toLowerCase().replace(/[.!?]+$/, "");
   const only = st.review.length === 1 ? st.review[0] : null;
   if (/^(status|\?|hi|hey|hello)$/.test(w)) return { reply: summary(st), speech: spokenSummary(st), chips: ["What's posting next?", "Anything broken?"] };
@@ -719,7 +719,7 @@ function quick(text, st) {
       const today = new Date().toLocaleDateString("sv");
       const js = posts([...PENDING, "SCHEDULED"]).filter((j) => matches(j, r) && postDay(j) >= today);
       if (!js.length) return { reply: `No upcoming videos${named(r) ? " match that" : ""}.` };
-      if (js.length === 1) return { reply: "", run: { action: "watch", key: js[0].key } };
+      if (js.length === 1) return via === "telegram" ? { reply: label(js[0]), video: js[0].key } : { reply: "", run: { action: "watch", key: js[0].key } };
       return { reply: `${js.length} videos:\n${listOf(js)}\nTap one to watch it.`, chips: js.slice(0, 8).map((j) => `watch ${accountName(j.account)} ${postDay(j)}`) };
     }
   }
@@ -928,9 +928,9 @@ function startDesk(text, st) {
 }
 
 // Quick commands answer at once ({done, reply}); anything else streams ({id}, then poll).
-function chat(text) {
+function chat(text, via = "cc") {
   const st = widgetState();
-  let r = quick(text, st);
+  let r = quick(text, st, via);
   if (r?.run) {
     const done = widgetAct(r.run);
     r = { ...r, reply: [r.reply, done.message ?? done.error ?? ""].filter(Boolean).join("\n") };
@@ -939,7 +939,7 @@ function chat(text) {
     note("info", "chat answered from a quick command", { q: text.slice(0, 200) });
     chatLog.push({ user: text, bot: r.reply });
     chatLog.splice(0, Math.max(0, chatLog.length - 12));
-    return { done: true, reply: r.reply, speech: r.speech, chips: r.chips ?? [], controls: !!r.controls, folders: !!r.folders, suggest: r.suggest };
+    return { done: true, reply: r.reply, speech: r.speech, chips: r.chips ?? [], controls: !!r.controls, folders: !!r.folders, suggest: r.suggest, video: r.video };
   }
   return { id: startDesk(text, st) };
 }
@@ -1031,7 +1031,7 @@ const server = createServer(async (req, res) => {
 
       if (url.pathname === "/api/chat") {
         if (typeof body.text !== "string" || !body.text.trim()) return send(400, { error: "empty message" });
-        return send(200, chat(body.text.slice(0, 2000)));
+        return send(200, chat(body.text.slice(0, 2000), body.via === "telegram" ? "telegram" : "cc"));
       }
       if (url.pathname === "/api/widget/act") {
         const r = widgetAct(body);

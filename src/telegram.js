@@ -58,7 +58,7 @@ export async function sendVideo(file, caption, buttons, cover = null) {
     const form = new FormData();
     form.append("chat_id", c.chatId);
     form.append("caption", caption.slice(0, 1024));
-    form.append("reply_markup", JSON.stringify({ inline_keyboard: [buttons] }));
+    if (buttons?.length) form.append("reply_markup", JSON.stringify({ inline_keyboard: [buttons] }));
     if (big && cover) form.append("photo", new Blob([readFileSync(cover)], { type: "image/jpeg" }), basename(cover));
     else form.append("video", new Blob([readFileSync(file)], { type: "video/mp4" }), basename(file));
     if (!big) {

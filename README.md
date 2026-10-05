@@ -190,8 +190,9 @@ The better the material, the better the videos:
 Anything else goes to Claude, which answers from the live state of your pipeline.
 Right-click cc for its menu: voice, colour, size, auto-hide.
 
-**In Telegram:** each new video arrives with Approve / Redo / Skip buttons, and `pause`,
-`resume`, `next` and `status` work there too.
+**In Telegram:** each new video arrives with Approve / Redo / Skip buttons. Anything else you
+send the bot goes to cc: every command above works there, cc's buttons come as Telegram
+buttons, and "show me Friday's videos" sends the video into the chat.
 
 **In a terminal:** `npm run status` (the jobs), `npm run logs -- --errors` (recent problems),
 `npm run doctor` (a health check), `npm run registry` (checks your project files).

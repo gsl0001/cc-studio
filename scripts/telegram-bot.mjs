@@ -6,17 +6,19 @@
 //   "next"                     -> start the next video (after a blocked or failed run)
 //   "status"                   -> what is waiting, blocked and queued
 //   "pause" / "resume"         -> create / remove STOP_AUTOMATION
+//   anything else              -> cc: the same chat as on the desktop (its commands and Claude),
+//                                 its buttons as Telegram buttons, videos sent here
 // Only messages from the configured chat count. Keep exactly one copy running: Telegram
 // gives a bot's updates to one poller (409 Conflict otherwise). Answers sent while the bot
 // is down wait on Telegram's side (24h) and are handled when it starts again; handling one
 // twice is harmless (a decided post is left alone, the creator lock allows one run).
 //
 //   node scripts/telegram-bot.mjs
-import { rmSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { niceWhen, pause, pauseEnd } from "../src/pause.js";
 import { db, log } from "../src/db.js";
 import { lifecycle, note } from "../src/log.js";
-import { channel, tg } from "../src/telegram.js";
+import { channel, sendVideo, tg } from "../src/telegram.js";
 import { decide, nextVideo as next, resolveHandoff, setPost } from "./posts.mjs";
 
 const chatId = channel()?.chatId;
@@ -26,6 +28,42 @@ lifecycle();
 const say = (text, extra = {}) => tg("sendMessage", { chat_id: chatId, text, ...extra }).catch((e) => { console.log(`send failed: ${e.message}`); note("warn", `send failed: ${e.message}`); });
 // A dead network fails every poll; log a failure once until it changes or polling recovers.
 let lastPollError = null;
+// cc's desk, the same chat as on the desktop. Its buttons can't ride in callback_data (64
+// bytes), so they wait here under a short id; a restart forgets them, and a stale tap says so.
+const DESK = `http://127.0.0.1:${process.env.DESK_PORT || 4820}`;
+const ccButtons = new Map();
+let ccSeq = 0;
+const remember = (what) => { const id = String(++ccSeq); ccButtons.set(id, what); if (ccButtons.size > 200) ccButtons.delete(ccButtons.keys().next().value); return id; };
+async function askCc(text, fallback = null) {
+  const typing = () => tg("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
+  typing();
+  const post = (path, body) => fetch(`${DESK}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000) }).then((x) => x.json());
+  let r = await post("/api/chat", { text, via: "telegram" }).catch(() => null);
+  if (!r) return say(fallback ?? `cc's desk isn't answering right now. "status", "next", "pause" and "resume" still work here.`);
+  for (let i = 0; r.id && !r.done && i < 120; i++) {   // a Claude answer streams in; wait for the whole of it
+    await new Promise((ok) => setTimeout(ok, 1000));
+    if (i % 4 === 3) typing();
+    r = { id: r.id, ...(await fetch(`${DESK}/api/chat/poll?id=${encodeURIComponent(r.id)}`).then((x) => x.json()).catch(() => ({}))) };
+  }
+  if (r.video) {
+    const job = db.prepare("SELECT video_path v FROM jobs WHERE key=?").get(r.video);
+    const file = [job?.v, `queue/${r.video}/final.mp4`].find((f) => f && existsSync(f));
+    if (file) { await sendVideo(file, r.reply || r.video, []); return; }
+  }
+  const rows = [];
+  if (r.suggest) rows.push([{ text: r.suggest.label ?? `Do it: ${r.suggest.action}`, callback_data: `cc:${remember({ act: r.suggest })}` }, { text: "No", callback_data: "cc:no" }]);
+  for (const c of (r.chips ?? []).slice(0, 8)) rows.push([{ text: c, callback_data: `cc:${remember({ say: c })}` }]);
+  await say(r.reply || r.text || r.error || "(no answer)", rows.length ? { reply_markup: { inline_keyboard: rows } } : {});
+}
+async function ccTap(q, id) {
+  await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
+  if (id === "no") return;
+  const b = ccButtons.get(id);
+  if (!b) return say("That button is from before a restart; ask again.");
+  if (b.say) return askCc(b.say);
+  const r = await fetch(`${DESK}/api/widget/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b.act) }).then((x) => x.json()).catch(() => null);
+  return say(r ? r.message ?? r.error ?? "Done." : "cc's desk isn't answering right now.");
+}
 const keyIn = (text) => /KEY: (\S+)/.exec(text ?? "")?.[1] ?? null;
 const cutIn = (text) => /CUT: (\d+)/.exec(text ?? "")?.[1] ?? null;
 
@@ -42,6 +80,7 @@ async function handle(u) {
     if (String(q.message?.chat?.id) !== chatId) return;
     const [verdict, key, cut = null] = q.data.split(":");
     await tg("answerCallbackQuery", { callback_query_id: q.id }).catch(() => {});
+    if (verdict === "cc") { ccTap(q, key).catch((e) => say(`cc: ${e.message}`)); return; }
     if (verdict === "posted" || verdict === "retry") {
       await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
       return say(resolveHandoff(key, verdict));
@@ -60,7 +99,7 @@ async function handle(u) {
   if (!m?.text || String(m.chat.id) !== chatId) return;
   const text = m.text.trim();
   const word = text.toLowerCase();
-  if (word === "status") return say(status());
+  if (word === "status") { askCc("status", status()).catch(() => say(status())); return; }
   if (word === "next") { next(); return say("Starting the next video."); }
   // The kill switch every script already honours (tick, pulse, creator, insights).
   if (word === "pause") { writeFileSync("STOP_AUTOMATION", `paused from Telegram ${new Date().toISOString()}\n`); return say("⏸ Paused: nothing renders or publishes until you send \"resume\". A render already running finishes; approvals still go into the queue."); }
@@ -70,7 +109,7 @@ async function handle(u) {
   const replied = m.reply_to_message?.caption ?? m.reply_to_message?.text;
   const key = keyIn(replied);
   const cut = cutIn(replied);
-  if (!key) return say(`Reply to a video (or its "What should change" message) so I know which post you mean. Or send "status" / "next".`);
+  if (!key) { askCc(text).catch((e) => say(`cc: ${e.message}`)); return; }
   const verdict = /^(approve|approved|yes|ok|👍|✅)$/i.test(text) ? "approve" : /^(skip|no)$/i.test(text) ? "skip" : null;
   // Free text is a redo only when it answers "What should change"; on the video itself it
   // could be praise, so ask first.
