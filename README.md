@@ -175,6 +175,7 @@ The better the material, the better the videos:
 | `next`, `next <account>` | makes the next video now |
 | `publish now`, `check logins` | uploads due videos now, checks every account is still logged in |
 | `pause`, `resume` (or `pause <account>`) | stops or restarts everything, or one account |
+| `pause for 3 days`, `pause until Thursday` | pauses now and starts again on its own, with a Telegram message when it does |
 | `folders`, `open <folder>` | opens the finished videos, a project's workspace, the week plans, the calendar or the latest report |
 | `post at 5pm` (or `post at 5pm for <account>`, `posting time auto`) | sets the daily posting time, after you confirm |
 | `mute`, `size small`, `hide` | cc itself |
@@ -200,7 +201,7 @@ Start with `npm run doctor`: it checks every part and says how to fix what's wro
 | **The Telegram bot doesn't answer** | Each bot can be used by one program only. If another tool uses the same bot, make a new one with @BotFather and run setup again. |
 | **Uploads fail with a login page** | The account's login expired. Run `npm run login -- <account-id>` and log in again. |
 | **Videos stop being made** | Check `npm run logs -- --errors`. A Claude usage limit pauses the creator for two hours; an expired Claude login needs `claude` run once in a terminal. |
-| **I want everything to stop now** | Say `pause` to cc or in Telegram. `resume` starts again. |
+| **I want everything to stop now** | Say `pause` to cc or in Telegram. `resume` starts again. For a break, `pause for 3 days` resumes on its own. Videos already scheduled on TikTok still go out. |
 | **I want to change an answer** | Run `npm run setup` again (your current values are the defaults), or edit the files below by hand. |
 | **I want to remove it** | `npm run tasks:uninstall` removes the scheduled jobs; then delete the folder. |
 

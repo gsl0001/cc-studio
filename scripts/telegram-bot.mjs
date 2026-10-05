@@ -13,6 +13,7 @@
 //
 //   node scripts/telegram-bot.mjs
 import { rmSync, writeFileSync } from "node:fs";
+import { niceWhen, pause, pauseEnd } from "../src/pause.js";
 import { db, log } from "../src/db.js";
 import { lifecycle, note } from "../src/log.js";
 import { channel, tg } from "../src/telegram.js";
@@ -63,6 +64,8 @@ async function handle(u) {
   if (word === "next") { next(); return say("Starting the next video."); }
   // The kill switch every script already honours (tick, pulse, creator, insights).
   if (word === "pause") { writeFileSync("STOP_AUTOMATION", `paused from Telegram ${new Date().toISOString()}\n`); return say("⏸ Paused: nothing renders or publishes until you send \"resume\". A render already running finishes; approvals still go into the queue."); }
+  const timed = /^pause\s+(.+)$/.exec(word), until = timed && pauseEnd(timed[1]);
+  if (until) { pause("Telegram", until); return say(`⏸ Paused until ${niceWhen(until)}. Then everything starts again on its own, and I'll tell you here. Send "resume" to end it sooner.`); }
   if (word === "resume") { rmSync("STOP_AUTOMATION", { force: true }); next(); return say("▶️ Resumed."); }
   const replied = m.reply_to_message?.caption ?? m.reply_to_message?.text;
   const key = keyIn(replied);

@@ -12,6 +12,7 @@ import { db, log, TERMINAL } from "./db.js";
 import { lifecycle, note, readLog } from "./log.js";
 import { ROOT, config, model, projectWorkspace, rootPath } from "./config.js";
 import { loadRegistry } from "./registry.js";
+import { niceWhen, pause, pauseEnd, pausedUntil } from "./pause.js";
 import { decide, nextVideo, resolveHandoff } from "../scripts/posts.mjs";
 import { creatorRunning, nextPost } from "../scripts/creator.mjs";
 import { nextWeek, isoWeekId } from "../auto_content_pipeline/src/schema.js";
@@ -250,6 +251,7 @@ function widgetState() {
   return {
     now: new Date().toISOString(),
     paused: existsSync(STOP_FILE),
+    paused_until: pausedUntil()?.toISOString() ?? null,
     bot_heartbeat_s: ageS("logs/.bot-heartbeat"),
     creator: creatorRunning(),
     creator_since_s: ageS("CREATOR_RUNNING"),
@@ -343,7 +345,7 @@ function widgetAct(a) {
   note(r.error ? "warn" : "info", `action ${a.action}${a.key ? ` ${a.key}` : ""}: ${r.message ?? r.error ?? "done"}`.slice(0, 400), a.key ? { key: a.key } : {});
   return r;
 }
-function doAct({ action, key, cut, feedback, time }) {
+function doAct({ action, key, cut, feedback, time, until }) {
   if (["approve", "skip", "redo"].includes(action)) {
     if (action === "redo" && !String(feedback ?? "").trim()) return { error: "say what to change" };
     const message = decide(key, action, String(feedback ?? ""), cut ?? null, "the desk");
@@ -373,7 +375,12 @@ function doAct({ action, key, cut, feedback, time }) {
     return r.status === 0 ? { ok: true, message: "Checking every account's login now. Problems will show here and in Telegram." } : { error: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
   }
   if (action === "posted" || action === "retry") return { ok: true, message: resolveHandoff(key, action) };
-  if (action === "pause") { writeFileSync(STOP_FILE, `paused from the desk widget ${new Date().toISOString()}\n`); log(null, "kill_switch", "engaged (widget)"); return { ok: true }; }
+  if (action === "pause") {
+    const end = until ? new Date(until) : null;
+    if (end && !(end > new Date())) return { error: "that time has already passed" };
+    pause("the desk", end); log(null, "kill_switch", `engaged (widget)${end ? ` until ${end.toISOString()}` : ""}`);
+    return { ok: true, message: end ? `Paused until ${niceWhen(end)}. Then everything starts again on its own, and I'll tell you in Telegram. Say resume to end it sooner.` : undefined };
+  }
   if (action === "resume") { rmSync(STOP_FILE, { force: true }); log(null, "kill_switch", "cleared (widget)"); nextVideo(); return { ok: true }; }
   const tasks = { pulse: "cc-studio pulse", tick: "cc-studio tick", bot: "cc-studio bot" };
   if (tasks[action]) {
@@ -465,7 +472,7 @@ const niceKey = (k) => {
 
 function summary(st) {
   const c = st.counts;
-  const bits = [st.paused ? "Paused" : "Running",
+  const bits = [st.paused ? (st.paused_until ? `Paused until ${niceWhen(new Date(st.paused_until))}` : "Paused") : "Running",
     st.bot_heartbeat_s != null && st.bot_heartbeat_s < 300 ? "the Telegram bot is fine" : "the Telegram bot is DOWN",
     st.creator ? `making ${niceKey(st.creator)}` : st.quota_pause ? "the creator is waiting out a Claude limit" : "the creator is idle"];
   return `${bits.join(", ")}.\n${c.rendered} waiting for you, ${c.blocked} blocked, ${c.planned} planned, ${c.approved + c.queued} queued, ${c.posted} posted.`;
@@ -475,7 +482,7 @@ function summary(st) {
 const plural = (n, one, many = `${one}s`) => `${n === 0 ? "no" : n === 1 ? "one" : n} ${n === 1 ? one : many}`;
 function spokenSummary(st) {
   const c = st.counts, says = [];
-  says.push(st.paused ? "I'm paused." : "Everything's running.");
+  says.push(st.paused ? (st.paused_until ? `I'm paused until ${niceWhen(new Date(st.paused_until))}.` : "I'm paused.") : "Everything's running.");
   if (!(st.bot_heartbeat_s != null && st.bot_heartbeat_s < 300)) says.push("The Telegram bot is down, so approvals can't reach me.");
   if (st.creator) says.push(`I'm making ${niceKey(st.creator)}.`);
   else if (st.quota_pause) says.push("I'm waiting for the Claude limit to reset before the next video.");
@@ -538,6 +545,9 @@ function quick(text, st) {
       : `Post ${whom} at ${nice12(time)} every day? Videos not uploaded yet move to ${nice12(time)}; ones already scheduled on TikTok keep their time.`,
       suggest: { action: "post_time", time, key: id ?? undefined, label: time === "auto" ? "Yes, pick automatically" : `Yes, ${nice12(time)}` } };
   }
+  // "pause for 3 days", "pause until thursday": pause now, resume on its own (the pulse lifts it).
+  const timed = /^pause(?:\s+(?:everything|all|it all))?\s+(.+)$/.exec(w), until = timed && pauseEnd(timed[1]);
+  if (until) return { reply: "", run: { action: "pause", until: until.toISOString() } };
   const acct = /^(pause|resume|next|make)\s+(?:a |the )?(?:next )?(?:video )?(?:for )?(.+)$/.exec(w);
   if (acct) {
     const toggle = acct[1] === "pause" || acct[1] === "resume";
@@ -576,6 +586,7 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
 - next, or next and an account name, to make a video now
 - publish now, check logins, run a pulse, restart bot
 - pause or resume everything, or one account: pause and its name
+- pause for a while and resume on its own: pause for 3 days, pause until Thursday
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;
@@ -633,7 +644,7 @@ If the user wants something done, add ONE line: ACTION: {"action":"...","key":".
 using one of: ${ACTIONS.join(", ")} (approve/skip/redo need the key and cut of a video waiting
 for review; redo needs feedback; next may take an account id as key to make that account's
 next post; pause_account/resume_account need an account id (${accountIds().join(", ")});
-post_time sets the daily posting time: "time":"HH:MM" (24 h) or "auto", with an account id as
+pause may take "until":"<ISO time>" to resume on its own then (the user says "pause for 3 days" or "until Thursday"; resolve it from NOW); post_time sets the daily posting time: "time":"HH:MM" (24 h) or "auto", with an account id as
 key for just one account (posts already scheduled on TikTok keep their time; never use redo for
 times, redo only remakes a video waiting for review); check runs the login check; open needs one of these keys: ${FOLDERS.map((f) => f.key).join(", ")}; retry/posted need
 the key of an upload that needs a human). It becomes a button the user taps; say what it will do.

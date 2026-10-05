@@ -13,6 +13,7 @@ import { existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } f
 import { db, log } from "../src/db.js";
 import { lifecycle, note, rotateTaskLogs } from "../src/log.js";
 import { notify } from "../src/telegram.js";
+import { liftExpired } from "../src/pause.js";
 import { nextWeek } from "../auto_content_pipeline/src/schema.js";
 import { relocateFinal, schedule, sendForReview, sendHandoff } from "./posts.mjs";
 import { creatorRunning, nextPost, QUOTA } from "./creator.mjs";
@@ -21,6 +22,11 @@ lifecycle();
 rotateTaskLogs();
 // What the pulse decided, on the console (pulse.log) and in the system log.
 const tell = (m, lvl = "info") => { console.log(m); note(lvl, m); };
+if (liftExpired()) {
+  log(null, "kill_switch", "cleared: the timed pause ended");
+  tell("The timed pause ended; everything runs again.");
+  await notify("▶️ Your pause is over: videos are being made and posted again.");
+}
 if (existsSync("STOP_AUTOMATION")) { console.log("STOP_AUTOMATION present — nothing runs."); process.exit(0); }
 const HOUR = 3_600_000;
 const ageMs = (f) => (existsSync(f) ? Date.now() - statSync(f).mtimeMs : Infinity);
