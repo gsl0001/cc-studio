@@ -493,6 +493,10 @@ async function tools() {
     const r = await run("pydeps", null, py);
     if (!r) { out.python = py; await say("That didn't work; you can run pip yourself later. Moving on."); break; }
   }
+  await say("The creator makes each video on its own, with no one there to click Allow. How should it get permission for what it does?");
+  out.permissionMode = await pick([["Auto mode: Claude Code checks each step and blocks risky ones (recommended)", "auto", S.permissionMode !== "bypass"],
+    ["No checks: fastest, but nothing stops a bad instruction", "bypass", S.permissionMode === "bypass"]]);
+  if (out.permissionMode === "bypass") note("Noted. You can switch back any time: creator.permissionMode in studio.config.json.");
   await say("May the creator use paid video-generation APIs (Runway, Kling, Veo...)? If not, posts that would need them wait for you.");
   out.paidVideoApis = await yesNo("Yes, it may", "No, ask me", S.paidVideoApis);
   await say("Any local video models on this computer the creator may run? Say which and how; or skip.");
@@ -509,6 +513,7 @@ async function save() {
   row("Telegram", out.telegramToken ? "new bot" : S.telegram ? "current bot" : "off");
   row("ElevenLabs", out.eleven ? "new key" : S.eleven ? "current key" : "off");
   row("Python", out.python);
+  row("Creator", out.permissionMode === "bypass" ? "no permission checks" : "auto mode");
   const card = el("div", "card"); card.appendChild(dl);
   await say("Here's everything. Save it?");
   feed.appendChild(card); scroll();

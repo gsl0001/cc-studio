@@ -42,6 +42,7 @@ export const DEFAULTS = {
     composition: "HyperFrames (npx hyperframes) or Remotion; plain ffmpeg for simple cuts",
     localVideoModels: "",           // optional: how to run local video models on this machine, told to the creator
     paidVideoApis: false,           // true lets the creator use paid video-generation APIs; false marks such posts blocked
+    permissionMode: "auto",         // how the unattended creator gets permission: "auto" (Claude Code's auto mode checks each action) or "bypass" (no checks)
   },
   telegram: { enabled: true },      // needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
 };

@@ -31,7 +31,7 @@ async function state() {
     projects: existingProjects(), windows: process.platform === "win32",
     avatar: existsSync(join(ROOT, "cc-avatar", "body_charcoal.png")), voiceServer: await voiceUp(),
     claude: spawnSync("claude --version", { shell: true }).status === 0,
-    python: pythonGuess(cfg), paidVideoApis: cfg.creator.paidVideoApis, localVideoModels: cfg.creator.localVideoModels,
+    python: pythonGuess(cfg), paidVideoApis: cfg.creator.paidVideoApis, permissionMode: cfg.creator.permissionMode, localVideoModels: cfg.creator.localVideoModels,
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN), eleven: Boolean(process.env.ELEVENLABS_API_KEY),   // only whether they're set, never the values
   };
 }
@@ -45,6 +45,7 @@ function save(b) {
   if (a.autoHideMinutes != null) cfg.assistant.autoHideMinutes = Math.max(0, Number(a.autoHideMinutes) || 0);
   if (b.python) cfg.paths.python = String(b.python);
   if (b.paidVideoApis != null) cfg.creator.paidVideoApis = Boolean(b.paidVideoApis);
+  if (["auto", "bypass"].includes(b.permissionMode)) cfg.creator.permissionMode = b.permissionMode;
   if (b.localVideoModels != null) cfg.creator.localVideoModels = String(b.localVideoModels);
   const env = {};
   if (b.telegramToken) env.TELEGRAM_BOT_TOKEN = String(b.telegramToken).trim();

@@ -30,6 +30,7 @@ unless absolute.
 | `creator.similarityLimit` | `0.35` | A render that reuses this share of a recent video's shots goes back for a remake (up to 3 tries). |
 | `creator.composition` | HyperFrames or Remotion; ffmpeg | What the creator should build videos with, in words. |
 | `creator.localVideoModels` | `""` | Optional: local video-generation models on this machine and how to run them, told to the creator. Empty: no AI footage unless the plan asks for it. |
+| `creator.permissionMode` | `"auto"` | How the unattended creator gets permission for each action: `"auto"` uses Claude Code's auto mode (a check approves routine work and blocks risky actions, which then fail rather than wait), `"bypass"` skips every check (`--dangerously-skip-permissions`; fastest, but nothing stands between a bad instruction and your machine). Auto mode needs a model that supports it (the default creator model does). |
 | `creator.paidVideoApis` | `false` | `true` lets the creator use paid video-generation APIs; `false` marks such posts blocked so you decide. |
 | `telegram.enabled` | `true` | Turn Telegram off without deleting the token. |
 

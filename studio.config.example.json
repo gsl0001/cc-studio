@@ -24,7 +24,8 @@
     "similarityLimit": 0.35,
     "composition": "HyperFrames (npx hyperframes) or Remotion; plain ffmpeg for simple cuts",
     "localVideoModels": "",
-    "paidVideoApis": false
+    "paidVideoApis": false,
+    "permissionMode": "auto"
   },
   "telegram": {
     "enabled": true

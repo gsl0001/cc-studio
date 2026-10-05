@@ -131,7 +131,8 @@ if (import.meta.filename === process.argv[1]) {
       `RECENT (this brand's latest videos; yours must look clearly different from every one):\n${recentBlock(account.project)}`,
       "", agentInstructions(profile)].join("\n");
     console.log(`\n=== creator ${p.key} run ${runs} at ${new Date().toISOString()} ===`);
-    const r = await runAgent(["-p", "--model", MODEL, "--dangerously-skip-permissions"], prompt, config.creator.maxRunMinutes * 60_000);   // prompt on stdin
+    const perms = config.creator.permissionMode === "bypass" ? ["--dangerously-skip-permissions"] : ["--permission-mode", "auto"];
+    const r = await runAgent(["-p", "--model", MODEL, ...perms], prompt, config.creator.maxRunMinutes * 60_000);   // prompt on stdin
     const out = r.out;
     const quota = /(reached|hit) your .*limit|usage limit|session limit/i.test(out);
     const after = db.prepare("SELECT status, plan_json FROM week_plans WHERE key=?").get(p.key);

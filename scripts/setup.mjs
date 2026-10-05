@@ -137,6 +137,7 @@ if (el && el !== "keep current") env.ELEVENLABS_API_KEY = el;
 console.log(bold("\n5. Tools"));
 cfg.paths.python = await ask("Python 3.10+ (a command or a path)", pythonGuess(cfg));
 if (!pythonReady(cfg.paths.python) && await yes("  Python is missing opencv-python, numpy or pillow. Install them now?", true)) run(...stepCommand("pydeps", cfg.paths.python, cfg));
+cfg.creator.permissionMode = await choose("How the unattended creator gets permission", [["auto", "auto mode: Claude Code checks each step and blocks risky ones (recommended)"], ["bypass", "no checks: fastest, but nothing stops a bad instruction"]], cfg.creator.permissionMode === "bypass" ? 1 : 0);
 cfg.creator.paidVideoApis = await yes("May the creator use paid video-generation APIs (Runway, Kling, Veo, ...)? No = such posts wait for you", cfg.creator.paidVideoApis);
 cfg.creator.localVideoModels = await ask("Local video models on this machine the creator may run, and how (optional)", cfg.creator.localVideoModels);
 

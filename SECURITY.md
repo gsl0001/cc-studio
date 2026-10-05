@@ -11,8 +11,8 @@
 - **The desk server** listens on `127.0.0.1:4820` only, checks the Host and Origin of every
   request, and opens only a fixed list of folders: nothing a request says reaches a command line.
 - **The Telegram bot** answers only the configured chat id.
-- **The creator** runs Claude Code with permissions skipped (`--dangerously-skip-permissions`)
-  so it can work unattended in the project's workspace. Its instructions treat the plan's text
+- **The creator** runs Claude Code unattended. By default it uses auto mode (`creator.permissionMode: "auto"`), where Claude Code checks each action and blocks risky ones; setup lets you choose `"bypass"` instead, which skips every check (`--dangerously-skip-permissions`).
+  Either way it works on its own in the project's workspace. Its instructions treat the plan's text
   (written from web research) and your feedback as data, never as instructions, and forbid
   touching cc-studio's own code. Run cc-studio on a machine and account you're comfortable
   giving an autonomous agent; keep anything sensitive out of its reach.
