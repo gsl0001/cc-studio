@@ -53,7 +53,19 @@ reuse their screens or footage, it comes straight back to you.
 ## 2. Build
 Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
 - **Composition:** {{COMPOSITION}}. 1080x1920, 30 fps.
-- **Footage:** real product screens, photos and recorded takes from the workspace first.{{LOCAL_MODELS}}
+- **Footage, in this order, for every scene:**
+  1. Real product screens, photos and recorded takes from the workspace.
+  2. The clip library, **before generating anything**: from `{{ROOT}}` run
+     `node scripts/clips.mjs find "<what the scene shows, in plain words>" --seconds <n> --project PROJECT`.
+     It searches the library, then free stock footage (Pexels, Pixabay; free for commercial
+     use, no credit needed), downloads what fits and prints each clip with a frame. **Look at
+     the frames**; use a clip only if it really shows the scene, and try other words once if
+     nothing fits. For each clip you use, run `node scripts/clips.mjs used <clip file> KEY`
+     and list it (source and page) in the post package. Avoid clips marked as used by this
+     project in the last 30 days. No stock clip with a recognisable brand, logo or a person
+     presented as using the product.
+  3. Only if neither has it: generated footage.{{LOCAL_MODELS}}
+  Stock footage is real footage: it does not make the video AI-generated (`--aigc`).
 - {{PAID_RULE}}
 - **Audio:** {{AUDIO}}
 - **Sound field:** TikTok's web upload cannot attach a trending TikTok sound. Use your own

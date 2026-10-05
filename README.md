@@ -28,7 +28,8 @@ go to, and whether they post automatically or wait for you to press Post.
   recent posts and current trends, then plans next week: hook, script, caption, hashtags,
   posting time and a different visual idea for every post.
 - **Finished videos.** Claude builds each post into a 1080x1920 video from your real
-  screenshots and footage (with HyperFrames, Remotion or ffmpeg), adds an ElevenLabs
+  screenshots and footage (with HyperFrames, Remotion or ffmpeg), looks for real footage in your
+  clip library and free stock sources before generating any scene, adds an ElevenLabs
   voiceover and music if you have a key, checks its own frames, and makes sure it doesn't look
   like your recent videos.
 - **Approval on your phone or desktop.** Each video comes to you in Telegram or in cc's chat
@@ -83,6 +84,9 @@ the new commands are found. To check everything at once later, run `npm run doct
   a bot; it takes two minutes.
 - An **ElevenLabs** API key ([elevenlabs.io](https://elevenlabs.io), Profile > API keys) for
   spoken voiceovers and music. Without it, videos use on-screen text and your own music.
+- Free **Pexels** and **Pixabay** API keys ([pexels.com/api](https://www.pexels.com/api/),
+  [pixabay.com/api/docs](https://pixabay.com/api/docs/)) for real stock footage. Before
+  generating any scene, the creator checks your clip library and then these free sources.
 
 **Which systems?** Everything works on **Windows 10 and 11**. On macOS and Linux the
 pipeline runs (with cron instead of Task Scheduler), but cc, the desktop companion, is

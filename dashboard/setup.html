@@ -382,6 +382,12 @@ async function main() {
   await say("Voiceover and music: with an ElevenLabs key, videos get a spoken voiceover and a music bed. Without it, they use on-screen text and your own music.");
   if (S.eleven && (await yesNo("Keep my current key", "Use a new key"))) note("Keeping the current ElevenLabs key.");
   else out.eleven = await ask({ type: "password", optional: true, placeholder: "ElevenLabs API key (elevenlabs.io > Profile > API keys)" });
+  const stock = el("div"); stock.innerHTML = `<br>Free keys: <a href="https://www.pexels.com/api/" target="_blank" rel="noopener">Pexels</a> and <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">Pixabay</a> (sign in, then copy the key).`;
+  await say("Before making any scene, the creator looks for real footage: your clip library first, then free stock videos from Pexels and Pixabay. That takes two free keys; skip them and it only uses your own clips.", stock);
+  for (const [k, name] of [["pexels", "Pexels"], ["pixabay", "Pixabay"]]) {
+    if (S[k] && (await yesNo(`Keep my ${name} key`, "Use a new key"))) continue;
+    out[k] = await ask({ type: "password", optional: true, placeholder: `${name} API key` });
+  }
 
   section("tools");
   await tools();
@@ -512,6 +518,7 @@ async function save() {
   if (!out.projects.length) row("Projects", S.projects.join(", ") || "none yet");
   row("Telegram", out.telegramToken ? "new bot" : S.telegram ? "current bot" : "off");
   row("ElevenLabs", out.eleven ? "new key" : S.eleven ? "current key" : "off");
+  row("Stock footage", ["pexels", "pixabay"].filter((k) => out[k] || S[k]).map((k) => k[0].toUpperCase() + k.slice(1)).join(", ") || "your own clips only");
   row("Python", out.python);
   row("Creator", out.permissionMode === "bypass" ? "no permission checks" : "auto mode");
   const card = el("div", "card"); card.appendChild(dl);

@@ -132,6 +132,11 @@ if (await yes("Set up a Telegram bot for approvals?", !process.env.TELEGRAM_BOT_
 console.log(bold("\n4. Voiceover and music (ElevenLabs)") + dim("  optional: without it videos use on-screen text and your own music"));
 const el = await ask("ElevenLabs API key (Enter to skip)", process.env.ELEVENLABS_API_KEY ? "keep current" : "");
 if (el && el !== "keep current") env.ELEVENLABS_API_KEY = el;
+console.log(dim("  Free stock footage the creator checks before generating a scene: free keys at pexels.com/api and pixabay.com/api/docs"));
+for (const [k, name] of [["PEXELS_API_KEY", "Pexels"], ["PIXABAY_API_KEY", "Pixabay"]]) {
+  const v = await ask(`${name} API key (Enter to skip)`, process.env[k] ? "keep current" : "");
+  if (v && v !== "keep current") env[k] = v;
+}
 
 // ---------------------------------------------------------------- tools and creator
 console.log(bold("\n5. Tools"));

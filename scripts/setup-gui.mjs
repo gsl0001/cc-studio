@@ -32,7 +32,7 @@ async function state() {
     avatar: existsSync(join(ROOT, "cc-avatar", "body_charcoal.png")), voiceServer: await voiceUp(),
     claude: spawnSync("claude --version", { shell: true }).status === 0,
     python: pythonGuess(cfg), paidVideoApis: cfg.creator.paidVideoApis, permissionMode: cfg.creator.permissionMode, localVideoModels: cfg.creator.localVideoModels,
-    telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN), eleven: Boolean(process.env.ELEVENLABS_API_KEY),   // only whether they're set, never the values
+    telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN), eleven: Boolean(process.env.ELEVENLABS_API_KEY), pexels: Boolean(process.env.PEXELS_API_KEY), pixabay: Boolean(process.env.PIXABAY_API_KEY),   // only whether they're set, never the values
   };
 }
 
@@ -51,6 +51,8 @@ function save(b) {
   if (b.telegramToken) env.TELEGRAM_BOT_TOKEN = String(b.telegramToken).trim();
   if (b.telegramChat) env.TELEGRAM_CHAT_ID = String(b.telegramChat).trim();
   if (b.eleven) env.ELEVENLABS_API_KEY = String(b.eleven).trim();
+  if (b.pexels) env.PEXELS_API_KEY = String(b.pexels).trim();
+  if (b.pixabay) env.PIXABAY_API_KEY = String(b.pixabay).trim();
   for (const [k, v] of Object.entries(env)) { if (/[\r\n]/.test(v)) throw new Error(`bad ${k}`); process.env[k] = v; }
   const written = saveSetup({ cfg, env, profiles: (b.projects ?? []).filter((p) => p?.name).map(makeProfile) });
   return { projects: written.map((w) => ({ id: w.id, name: w.name, workspace: w.workspace, accounts: w.accounts.map((x) => ({ id: x.id, platform: x.platform, handle: x.handle })) })) };

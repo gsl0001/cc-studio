@@ -47,6 +47,9 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
   const me = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.json()).catch(() => null);
   me?.ok ? ok("Telegram bot", `@${me.result.username}`) : bad("Telegram bot", "TELEGRAM_BOT_TOKEN in .env was refused by Telegram; make a new token with @BotFather");
 } else warn("Telegram", "not configured: approvals only in cc's chat. run: npm run setup to add a bot");
+[process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean).length
+  ? ok("Stock footage", [process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean).join(", "))
+  : warn("Stock footage", "no PEXELS_API_KEY or PIXABAY_API_KEY: the creator only searches your own clip library before generating scenes (free keys: pexels.com/api, pixabay.com/api/docs)");
 process.env.ELEVENLABS_API_KEY ? ok("ElevenLabs key") : warn("ElevenLabs", "no ELEVENLABS_API_KEY: videos get no voiceover or generated music");
 
 // cc (Windows)

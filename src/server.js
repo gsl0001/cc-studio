@@ -532,6 +532,7 @@ const FOLDERS = [
     { key: `work-${p.id}`, label: `${p.name ?? p.id} workspace`, path: projectWorkspace(p), also: [`${p.id} workspace`, `${(p.name ?? p.id).toLowerCase()} work`, (p.name ?? p.id).toLowerCase()] },
   ]),
   ...(config.paths.handPost ? [{ key: "hand", label: "Hand-post folder", path: rootPath(config.paths.handPost), also: ["hand finals", "hand post"] }] : []),
+  { key: "clips", label: "Clip library", path: rootPath("library/clips"), also: ["clips", "library", "stock", "stock clips", "footage", "clip library"] },
   { key: "weeks", label: "Week plans", path: "auto_content_pipeline/output/weeks", also: ["plans", "weeks", "week plans", "plan folder"] },
   { key: "calendar", label: "Calendar", url: "/calendar", also: ["the calendar", "week calendar"] },
   { key: "report", label: "Latest report", also: ["report", "insights", "insights report", "the report"], find: () => {
