@@ -19,7 +19,7 @@ import { channel, tg } from "../src/telegram.js";
 import { decide, nextVideo as next, resolveHandoff, setPost } from "./posts.mjs";
 
 const chatId = channel()?.chatId;
-if (!chatId) { console.error("Telegram not configured (~/.claude/channels/telegram)"); process.exit(1); }
+if (!chatId) { console.error("Telegram not configured: set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env (npm run setup)"); process.exit(1); }
 
 lifecycle();
 const say = (text, extra = {}) => tg("sendMessage", { chat_id: chatId, text, ...extra }).catch((e) => { console.log(`send failed: ${e.message}`); note("warn", `send failed: ${e.message}`); });

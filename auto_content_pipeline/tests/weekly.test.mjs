@@ -10,13 +10,13 @@ export const goodPost = (over = {}) => ({
   hook: { text: "Your taskbar is lying to you", first_frame_motion: "cursor flicks across a cluttered taskbar" },
   script: [{ start: 0, end: 2, visual: "cluttered taskbar", voiceover: "Stop hunting apps", overlay: "Stop hunting apps" }],
   duration_s: 12, caption: "One flick, every app. #windows", hashtags: ["#windows", "#productivity"],
-  search_keywords: ["windows app launcher"], cta: "Try MyBrand — link in bio", sound: "original voiceover",
+  search_keywords: ["offline notes app"], cta: "Try MyBrand — link in bio", sound: "original voiceover",
   is_aigc: false, references: [], rationale: "top post pattern", experiment_arm: "control", visual: "cluttered taskbar recording",
   backups: [{ hook: "b1", angle: "a1", caption: "c1" }, { hook: "b2", angle: "a2", caption: "c2" }],
   status: "planned", ...over,
 });
 export const goodPlan = (over = {}) => ({
-  account: "mybrand-tiktok", project: "mybrand", platform: "tiktok", handle: "mybrand.launcher",
+  account: "mybrand-tiktok", project: "mybrand", platform: "tiktok", handle: "mybrand.notes",
   week: "2026-W41", generated_at: "2026-10-03T19:00:00Z",
   style: { group: "mybrand", pillar: "demos", voice: "calm", formats: ["demo"], differentiator: "x" },
   brief: {}, experiment: { hypothesis: "h", control: "c", variant: "v", success_metric: "avg watch" },
@@ -49,7 +49,7 @@ const brief = briefFrom({
   snapshots: [
     { followers: 30, views_28d: 6709, age: { "25-34": 0.49, "18-24": 0.29 }, gender: { Male: 0.7, Female: 0.3 },
       locations: [{ country: "CA", pct: 0.5, cities: { Surrey: 0.4, Other: 0.6 } }],
-      traffic: { "For You": 0.8 }, search_terms: { "mybrand app": 0.5, "pc launcher": 0.2 },
+      traffic: { "For You": 0.8 }, search_terms: { "mybrand app": 0.5, "study notes": 0.2 },
       active_hours: Array.from({ length: 24 }, (_, h) => (h === 9 ? 90 : h === 14 ? 80 : h === 20 ? 70 : 10)),
       also_watched_creators: [{ handle: "carterpcs", followers: 7e6 }] },
     { followers: 27 },
@@ -67,7 +67,7 @@ assert.deepStrictEqual(brief.best_post_hours[0], { hour: 18, avg_views: 2200, po
 assert.strictEqual(brief.top_posts[0].views, 900, "top posts use the 28-day window only");
 assert.strictEqual(brief.top_posts[0].drop_off_s, 2);
 assert.strictEqual(brief.bottom_posts[0].views, 50);
-assert.deepStrictEqual(brief.search_terms, ["mybrand app", "pc launcher"]);
+assert.deepStrictEqual(brief.search_terms, ["mybrand app", "study notes"]);
 assert.deepStrictEqual(brief.also_watched, ["carterpcs"]);
 assert.strictEqual(brief.audience.cities[0].city, "Surrey, CA");
 assert.strictEqual(dropOff(null), null);
@@ -187,7 +187,7 @@ console.log("styles ok");
 
 // --- plan
 import { planPrompt, stampPlan, mergeRepairs } from "../src/plan.js";
-const acct = { id: "mybrand-tiktok", project: "mybrand", platform: "tiktok", handle: "mybrand.launcher" };
+const acct = { id: "mybrand-tiktok", project: "mybrand", platform: "tiktok", handle: "mybrand.notes" };
 const stamped = stampPlan({ account: "wrong", posts: [{ day: "2026-10-05", key: "bad", status: "posted" }] },
   { account: acct, week: "2026-W41", style: { group: "mybrand" }, now: new Date("2026-10-03T19:00:00Z") });
 assert.strictEqual(stamped.account, "mybrand-tiktok", "identity comes from the registry, not the model");

@@ -398,7 +398,7 @@ dialog .foot { padding: .7rem 1.1rem; border-top: 1px solid var(--line); display
     </section>
     <div class="cols" style="margin-top:1.2rem">
       <section class="card">
-        <h2><svg class="i "><use href="#i-note"/></svg>Agent brief — agents/account.md
+        <h2><svg class="i "><use href="#i-note"/></svg>Agent brief — agents/creator.md
           <span class="right">
             <span class="empty-note" id="tpl-count"></span>
             <button data-act="tpl-revert"><svg class="i "><use href="#i-refresh"/></svg>Revert</button>
@@ -406,7 +406,7 @@ dialog .foot { padding: .7rem 1.1rem; border-top: 1px solid var(--line); display
           </span>
         </h2>
         <textarea id="tpl" rows="22" spellcheck="false"></textarea>
-        <p class="empty-note" style="margin-top:.5rem">Every account's run is this file with its ACCOUNT/PROJECT/SLOTS header prepended. The previous version is kept as account.md.bak.</p>
+        <p class="empty-note" style="margin-top:.5rem">Every account's run is this file with its ACCOUNT/PROJECT/SLOTS header prepended. The previous version is kept as creator.md.bak.</p>
       </section>
       <section class="card">
         <h2><svg class="i "><use href="#i-terminal"/></svg>Agent runs</h2>
@@ -795,7 +795,7 @@ function renderDesk(s, h, needsYou, live, enabled) {
     ${healthRow("Last activity", ago(h.last_event), "", "clock")}`;
 }
 const healthRow = (k, v, tone = "", ic = "") =>
-  `<div class="health-row ${tone ? "t-" + tone : ""}"><span class="k">${ic ? icon(ic) : ""}${k}</span><span class="v">${esc(v)}</span></div>`;
+  `<div class="health-row ${tone ? "t-" + tone : ""}"><span class="k">${ic ? icon(ic) : ""}${esc(k)}</span><span class="v">${esc(v)}</span></div>`;
 
 function accountHead(a) {
   return `<div class="account-head">
@@ -1138,7 +1138,7 @@ document.addEventListener("click", async (ev) => {
       return;
     }
     case "tpl-save": {
-      return confirmDo("Save agent brief", "Every account's next run uses this text. The current version is kept as agents/account.md.bak.",
+      return confirmDo("Save agent brief", "Every account's next run uses this text. The current version is kept as agents/creator.md.bak.",
         "Save", () => api("/api/agent-template", { text: $("tpl").value })
           .then(() => { ui.tplDirty = false; toast("brief saved", "good"); refresh(); }), "primary");
     }

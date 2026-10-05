@@ -567,7 +567,7 @@ const desk = { proc: null, buf: "", queue: [], current: null, turns: 0 };
 function deskStart() {
   const args = ["-p", "--model", model("desk"), "--input-format", "stream-json",
     "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--strict-mcp-config", "--disable-slash-commands",
-    "--no-session-persistence", "--no-chrome", "--settings", DESK_SETTINGS, "--append-system-prompt-file", DESK_RULES];
+    "--no-session-persistence", "--no-chrome", "--settings", `"${DESK_SETTINGS}"`, "--append-system-prompt-file", `"${DESK_RULES}"`];   // shell:true, and temp paths can hold spaces
   const p = spawn("claude", args, { shell: true, windowsHide: true, cwd: DESK_DIR });
   desk.proc = p; desk.buf = ""; desk.turns = 0;
   note("info", "chat session started");
@@ -674,7 +674,7 @@ function streamVideo(req, res, key) {
 // ---------------------------------------------------------------------- routes
 const server = createServer(async (req, res) => {
   const send = (code, body, type = "application/json") => {
-    res.writeHead(code, { "content-type": type, "cache-control": "no-store" });
+    res.writeHead(code, { "content-type": type, "cache-control": "no-store", "x-frame-options": "DENY" });
     res.end(type === "application/json" ? JSON.stringify(body) : body);
   };
   try {

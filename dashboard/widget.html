@@ -150,9 +150,15 @@ async function say(text) {
   const t = bubble("…", "bot");
   t.classList.add("typing");
   try {
-    const r = await post("/api/chat", { text });
+    let r = await post("/api/chat", { text });
+    // Quick commands answer at once; anything else is a chat turn to poll while it streams.
+    for (let i = 0; r.id && !r.done && i < 300; i++) {
+      await new Promise((ok) => setTimeout(ok, 500));
+      r = { id: r.id, ...(await fetch(`/api/chat/poll?id=${encodeURIComponent(r.id)}`).then((x) => x.json())) };
+      if (r.text) t.textContent = r.text;
+    }
     t.classList.remove("typing");
-    t.textContent = r.reply || r.error || "(no answer)";
+    t.textContent = r.reply || r.text || r.error || "(no answer)";
     if (r.suggest) suggestion(r.suggest);
   } catch { t.textContent = "The desk server didn't answer."; }
   refresh();

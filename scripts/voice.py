@@ -88,6 +88,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, {"ok": True, "voices": sorted(VOICES)}) if self.path == "/health" else self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        # Only cc and setup on this machine: no browser page (it would send an Origin), no rebinding.
+        if self.headers.get("origin") or self.headers.get("host") not in ("127.0.0.1:4821", "localhost:4821"):
+            return self.send(403, {"error": "forbidden"})
         if self.path != "/speak":
             return self.send(404, {"error": "not found"})
         try:
@@ -97,7 +100,7 @@ class Handler(BaseHTTPRequestHandler):
             if name in PRESETS:
                 voice, pace, lift = STYLES[name], PRESETS[name][1], PRESETS[name][2]
             else:
-                voice, pace, lift = (name if name in VOICES else "af_heart"), float(req.get("speed", 1.05)), 1.0
+                voice, pace, lift = (name if name in VOICES else "af_heart"), min(2.0, max(0.5, float(req.get("speed", 1.05)))), 1.0
             if not text:
                 return self.send(400, {"error": "empty text"})
             with lock:

@@ -62,6 +62,8 @@ that runs right there, with its output shown live:
 3. register the scheduled jobs,
 4. run a health check (`npm run doctor`).
 
+![Setup as a chat with cc](docs/images/setup-chat.png)
+
 Prefer the terminal? `npm run setup:cli` asks the same questions there (and takes piped answers).
 
 Then put real material in your project's workspace (`workspaces/<project>/assets`: logos,

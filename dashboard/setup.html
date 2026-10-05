@@ -467,12 +467,13 @@ async function telegram() {
     av.set("busy");
     let chat = null;
     for (let i = 0; i < 24 && !chat; i++) chat = (await api("/api/telegram/chat", { token }).catch(() => ({}))).chat;
-    if (chat) { out.telegramChat = String(chat); av.happy(); await say("Got your message. Approvals will come to that chat."); }
-    else {
-      av.set("idle");
-      await say("I didn't see a message. You can type your chat id instead, or skip and set it later.");
-      out.telegramChat = await ask({ optional: true, check: (v) => (/^-?\d+$/.test(v) ? "" : "A chat id is a number.") });
+    if (chat) {
+      await say(`Got a message from ${chat.name}. Is that you?`);
+      if (await yesNo("Yes, that's me", "No")) { out.telegramChat = String(chat.id); av.happy(); await say("Approvals will come to that chat."); return; }
     }
+    av.set("idle");
+    await say(`${chat ? "OK." : "I didn't see a message."} You can type your chat id instead, or skip and set it later.`);
+    out.telegramChat = await ask({ optional: true, check: (v) => (/^-?\d+$/.test(v) ? "" : "A chat id is a number.") });
     return;
   }
 }

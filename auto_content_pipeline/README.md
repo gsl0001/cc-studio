@@ -4,8 +4,7 @@ The weekly content strategist: every Saturday evening, after the metrics run, it
 next Monday–Sunday for every TikTok account — one fully specified post per account per day
 (time, hook, script, caption, hashtags, search keywords, sound, rationale, backups).
 
-Design: [docs/weekly-strategist-design.md](docs/weekly-strategist-design.md), plan:
-[docs/implementation-plan.md](docs/implementation-plan.md). Status: built; runs every
+How it fits the whole pipeline: [docs/architecture.md](../docs/architecture.md). Runs every
 Saturday after the metrics job. By hand: `npm run strategist` (or `-- <brand|account>`).
 Tests: `node auto_content_pipeline/tests/weekly.test.mjs`.
 

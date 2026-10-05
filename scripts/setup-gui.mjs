@@ -68,7 +68,7 @@ function runStep(res, step, arg) {
 
 const server = createServer(async (req, res) => {
   const send = (code, body, type = "application/json") => {
-    res.writeHead(code, { "content-type": type, "cache-control": "no-store" });
+    res.writeHead(code, { "content-type": type, "cache-control": "no-store", "x-frame-options": "DENY" });
     res.end(type === "application/json" ? JSON.stringify(body) : body);
   };
   try {

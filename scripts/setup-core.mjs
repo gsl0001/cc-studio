@@ -56,7 +56,7 @@ export function mergeEnv(text, values) {
   for (const [k, v] of Object.entries(values)) {
     if (v === undefined) continue;
     const re = new RegExp(`^#?\\s*${k}=.*$`, "m");
-    text = re.test(text) ? text.replace(re, `${k}=${v}`) : `${text.trimEnd()}\n${k}=${v}\n`;
+    text = re.test(text) ? text.replace(re, () => `${k}=${v}`) : `${text.trimEnd()}\n${k}=${v}\n`;
   }
   return text;
 }
@@ -91,8 +91,10 @@ export function saveSetup({ cfg, env = {}, profiles = [] }) {
 
 // Telegram: the bot's username for a token (null if refused), and the latest chat that messaged it.
 export const telegramMe = (token) => fetch(`https://api.telegram.org/bot${token}/getMe`).then((r) => r.json()).then((j) => (j.ok ? j.result.username : null)).catch(() => null);
+// Returns { id, name } so the user can check the message was theirs (anyone can message a bot).
 export const telegramChat = (token, wait = 5) => fetch(`https://api.telegram.org/bot${token}/getUpdates?timeout=${wait}`).then((r) => r.json())
-  .then((u) => u?.result?.map((x) => x.message?.chat?.id).filter(Boolean).at(-1) ?? null).catch(() => null);
+  .then((u) => { const c = u?.result?.map((x) => x.message?.chat).filter(Boolean).at(-1); return c ? { id: c.id, name: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.title || (c.username ? `@${c.username}` : String(c.id)) } : null; })
+  .catch(() => null);
 
 export const pythonGuess = (cfg) => (cfg.paths.python !== DEFAULTS.paths.python ? cfg.paths.python : spawnSync("python", ["--version"]).status === 0 ? "python" : "py");
 export const pythonReady = (py) => spawnSync(tool(py), ["-c", "import cv2, numpy, PIL"]).status === 0;

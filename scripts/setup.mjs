@@ -122,8 +122,8 @@ if (await yes("Set up a Telegram bot for approvals?", !process.env.TELEGRAM_BOT_
     console.log(`  Now send any message to @${username} in Telegram. Waiting up to 2 minutes...`);
     let chat = null;
     for (let i = 0; i < 24 && !chat; i++) chat = await telegramChat(token);
-    if (chat) { env.TELEGRAM_CHAT_ID = String(chat); console.log(`  Got it: chat ${chat}.`); }
-    else env.TELEGRAM_CHAT_ID = await ask("  No message seen. Your chat id (or Enter to skip)", process.env.TELEGRAM_CHAT_ID ?? "");
+    if (chat && await yes(`  Got a message from ${chat.name}. Is that you?`, true)) { env.TELEGRAM_CHAT_ID = String(chat.id); console.log(`  Approvals go to chat ${chat.id}.`); }
+    else env.TELEGRAM_CHAT_ID = await ask(`  ${chat ? "OK." : "No message seen."} Your chat id (or Enter to skip)`, process.env.TELEGRAM_CHAT_ID ?? "");
     break;
   }
 }

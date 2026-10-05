@@ -47,7 +47,7 @@ const sent = await notify(text, report && existsSync(report) ? report : null);
 log(null, "weekly_insights", `sweep=${rc.sweep} insights=${rc.insights} telegram=${sent}`);
 
 // Next week's plan, from the numbers above. Specced in
-// auto_content_pipeline/docs/weekly-strategist-design.md, not built yet.
+// the weekly strategist design, not built yet.
 const STRATEGIST = "auto_content_pipeline/scripts/weekly-strategist.mjs";
 if (existsSync(STRATEGIST)) run(STRATEGIST, [], 3 * 60 * 60_000);
 else console.log("weekly strategist not built yet — skipped.");
