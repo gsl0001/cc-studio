@@ -65,13 +65,18 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
      and list it (source and page) in the post package. Avoid clips marked as used by this
      project in the last 30 days. No stock clip with a recognisable brand, logo or a person
      presented as using the product.
-  3. If nothing fits, **ask the user for the clip** instead of generating it: for each scene
-     you're missing, run `node scripts/clips.mjs request "<what the scene shows>" --key KEY --seconds <n>`
+  3. If nothing fits, make the scene **another way with what you have** before asking anyone:
+     animate the workspace's photos and screens (pan, zoom, split, before/after), motion
+     graphics or kinetic type, a different visual that tells the same beat, or generated
+     footage.{{LOCAL_MODELS}}
+  4. Only if a scene truly needs real footage that none of the above can give, and another
+     visual would make the post clearly worse, **ask the user for the clip**: for each such
+     scene run `node scripts/clips.mjs request "<what the scene shows>" --key KEY --seconds <n>`
      from `{{ROOT}}` (they get it in Telegram with search links), then
-     `node scripts/posts.mjs set KEY blocked --note "waiting for clips: <scenes>"` and stop. When
-     their clips arrive, this post comes back to you with a note naming the files (they are
-     in the library under the scene's words).
-  4. Only when the note says no clip came (the user chose "Make it without"): generated footage.{{LOCAL_MODELS}}
+     `node scripts/posts.mjs set KEY blocked --note "waiting for clips: <scenes>"` and stop.
+     When their clips arrive, this post comes back to you with a note naming the files (they
+     are in the library under the scene's words). If the note says no clip came (the user
+     chose "Make it without"), make it with step 3.
   Stock footage is real footage: it does not make the video AI-generated (`--aigc`).
 - {{PAID_RULE}}
 - **Audio:** {{AUDIO}}
