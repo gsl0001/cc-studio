@@ -142,7 +142,10 @@ message as a carousel and as a video.
 
 - **After each weekly insights run,** refresh each account's numbers in CONTEXT.md and its
   What works / What fails lists.
-- **Promote a hook type or format to "works"** when it beats the account's median 3-second
-  retention by 1.5x on at least 2 posts. **Demote it** after 3 posts below the median.
+- **Formats and hook types are promoted and dropped by the scorecard**, in code
+  (`src/scorecard.js`, run before every weekly plan): each post's views in its first 48
+  hours against the account's median. A format or hook type with 3+ posts at 1.25x the
+  median or better is a winner and gets at least 3 posts a week; one whose last 3 posts
+  were all in the account's bottom quarter is dropped for 4 weeks.
 - **Change this file** only when data from at least two accounts, or a platform policy
   change, contradicts a rule.

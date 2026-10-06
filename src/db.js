@@ -168,5 +168,6 @@ export function log(jobKey, event, detail = "") {
     jobKey, event, String(detail)
   );
   console.log(`[${new Date().toISOString()}] ${jobKey} ${event} ${detail}`);
-  note(levelOf(event, String(detail)), `${event}${detail === "" ? "" : ` ${detail}`}`, jobKey ? { key: jobKey } : {});
+  // The canary stops before the final button on purpose: its hand-over isn't a problem.
+  note(jobKey?.startsWith("canary-") ? "info" : levelOf(event, String(detail)), `${event}${detail === "" ? "" : ` ${detail}`}`, jobKey ? { key: jobKey } : {});
 }

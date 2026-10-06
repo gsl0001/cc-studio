@@ -180,6 +180,21 @@ The better the material, the better the videos:
 - **Post.** Approved videos are scheduled from 08:00 onward, at most one upload per run, at
   the times you set.
 - **Learn.** Next Saturday it reads how the videos did, and the next plan builds on it.
+  Every post gets a score: its views in the first 48 hours against the account's median.
+  A format (or hook type) that lands in the account's bottom quarter 3 times in a row is
+  dropped for 4 weeks, and one at 1.25x the median or better over 3+ posts gets at least 3
+  posts a week. `node src/scorecard.js` prints each account's scorecard.
+- **Less approving, once it knows what works.** A video in a format the scorecard has proven
+  on that account (3+ scored posts at the median or better), made as the experiment's
+  control on the first try, that passes the checks (similarity, size, length, loudness,
+  caption), is approved on its own. It waits 6 hours first; Telegram shows it with a
+  **Stop** button, and a morning digest lists what went out by itself. Experiments, new
+  formats and anything a check flags still come to you. `node scripts/autoapprove.mjs check <key>`
+  says why a post would or wouldn't qualify.
+- **A daily TikTok check.** Once a day the pulse runs the real upload path on a test video in
+  one account's Studio (file, caption, AI label, the schedule pickers) and stops before the
+  Schedule button. If TikTok changed something, Telegram tells you that day, with a
+  screenshot, before real posts start failing. Nothing is posted.
 
 ## Everyday use
 
@@ -210,7 +225,9 @@ The better the material, the better the videos:
 Anything else goes to Claude, which answers from the live state of your pipeline.
 Right-click cc for its menu: voice, colour, size, auto-hide.
 
-**In Telegram:** each new video arrives with Approve / Redo / Skip buttons. Anything else you
+**In Telegram:** each new video arrives with Approve / Redo / Skip buttons; an auto-approved
+one arrives with a Stop button (or send `stop <key>`). `auto off` sends every video to you
+again, `auto on` turns auto-approval back on. Anything else you
 send the bot goes to cc: every command above works there, cc's buttons come as Telegram
 buttons, and "show me Friday's videos" sends the video into the chat.
 

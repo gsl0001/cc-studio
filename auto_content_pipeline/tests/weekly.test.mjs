@@ -96,6 +96,11 @@ r = run([goodPost({ hook: { text: "old hook", first_frame_motion: "m" } })]);
 assert.ok(r.invalid[0].reasons.some((x) => x.includes("recent hook")), "hook repeat is case/punctuation blind");
 r = run([goodPost(), goodPost({ key: "k2", hook: { text: "Other", first_frame_motion: "m" } })]);
 assert.ok(r.invalid[0].reasons.some((x) => x.includes("second post on")));
+// The scorecard's dropped formats and hook types are refused for that account only.
+const fmt = family(goodPost().format);
+r = run([goodPost(), second({ hook_type: "Pain question" })], { dropped: new Map([["mybrand-tiktok", new Set([`format:${fmt}`, "hook_type:pain question"])]]) });
+assert.ok(r.invalid.length === 2 && r.invalid[0].reasons.some((x) => x.includes("dropped")) && r.invalid[1].reasons.some((x) => x.includes("hook type")), "dropped format and hook type refused");
+assert.deepStrictEqual(run([goodPost()], { dropped: new Map([["other-account", new Set([`format:${fmt}`])]]) }).invalid, [], "another account's drop doesn't apply");
 r = run([goodPost({ hashtags: Array(9).fill("#x") })]);
 assert.ok(r.invalid[0].reasons.some((x) => x.includes("hashtags")));
 r = run([goodPost({ duration_s: 45 })]);

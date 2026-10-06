@@ -34,7 +34,9 @@ export function postText(p) {
 // the account's experiment.
 // `pinned` maps an account to the posting time you fixed for it (profile post_time): its posts
 // take that time whatever the model picked, and the spacing rule does not apply to them.
-export function validateWeek(plans, { projects, recentHooks = [], recentVisuals = [], days, fixed = [], pinned = new Map() }) {
+// `dropped` maps an account to the formats and hook types the scorecard dropped ("format:<family>",
+// "hook_type:<type>"; src/scorecard.js).
+export function validateWeek(plans, { projects, recentHooks = [], recentVisuals = [], days, fixed = [], pinned = new Map(), dropped = new Map() }) {
   const seenHooks = new Set(recentHooks.map(norm));
   const seenVisuals = new Map(recentVisuals.map((v) => [visualId(v), "a recent post"]));
   const taken = [];
@@ -69,6 +71,9 @@ export function validateWeek(plans, { projects, recentHooks = [], recentVisuals 
         if ((formats.get(family(p.format)) ?? 0) >= MAX_FORMAT) reasons.push(`format "${family(p.format)}" already used ${MAX_FORMAT}x this week by this account`);
         if ((pillars.get(family(p.pillar)) ?? 0) >= MAX_SAME) reasons.push(`pillar "${family(p.pillar)}" already used ${MAX_SAME}x this week by this account`);
         if (!ARMS.includes(p.experiment_arm)) reasons.push('experiment_arm must be "control" or "variant"');
+        const off = dropped.get(plan.account);
+        if (off?.has(`format:${family(p.format)}`)) reasons.push(`format "${family(p.format)}" is dropped for this account (bottom quarter 3 posts in a row): pick another format`);
+        if (p.hook_type && off?.has(`hook_type:${norm(p.hook_type)}`)) reasons.push(`hook type "${p.hook_type}" is dropped for this account (bottom quarter 3 posts in a row): pick another`);
       }
       if (reasons.length) {
         invalid.push({ account: plan.account, key: p.key, reasons });

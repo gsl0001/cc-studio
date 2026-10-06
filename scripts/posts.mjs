@@ -121,6 +121,9 @@ function queueKey(account, day) {
   throw new Error(`${account} ${day}: no free queue key`);
 }
 
+// An auto-approved post waits out its hold (scripts/autoapprove.mjs) before it is queued.
+export const held = (post, now = Date.now()) => !!post.auto?.hold_until && !post.auto.stopped && Date.parse(post.auto.hold_until) > now;
+
 const SCHED_LOCK = "SCHEDULING";
 export function schedule() {
   // One scheduler at a time: the pulse, the bot and the desk all call this, and two at once
@@ -151,6 +154,7 @@ function scheduleOnce() {
   for (const r of db.prepare("SELECT key, account, day, plan_json FROM week_plans WHERE status='approved' ORDER BY day, post_at").all()) {
     relocateFinal(r.key);
     const post = JSON.parse(row(r.key).plan_json);
+    if (held(post)) continue;
     if (!post.video || !existsSync(post.video)) { setPost(r.key, "blocked", { note: `approved but the video is missing: ${post.video ?? "(none)"}` }); out.push(`BLOCKED  ${r.key}: video missing`); continue; }
     const qkey = queueKey(r.account, r.day);
     // queue.js reads caption, hashtags, is_aigc and the planned time from plans/<key>.json.

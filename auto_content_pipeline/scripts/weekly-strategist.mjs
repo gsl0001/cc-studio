@@ -20,6 +20,8 @@ import { groupAccounts, proposeStyles, acceptStyles } from "../src/styles.js";
 import { planGroup, repairGroup, mergeRepairs, repairExperiments } from "../src/plan.js";
 import { validateWeek, experimentProblems } from "../src/validate.js";
 import { renderCalendar } from "../src/calendar.js";
+import { droppedSets, rulesFor, scoreAll, scorecardLines } from "../../src/scorecard.js";
+import { family, norm } from "../src/validate.js";
 
 if (existsSync("STOP_AUTOMATION")) { console.log("STOP_AUTOMATION present — nothing runs."); process.exit(0); }
 
@@ -83,6 +85,11 @@ for (const e of experiments) {
     { hypothesis: e.hypothesis, control: e.control_desc, variant: e.variant_desc }, done ? "done" : "active",
     `control ${e.control.avg_views ?? "?"} avg views (n=${e.control.n}), variant ${e.variant.avg_views ?? "?"} (n=${e.variant.n}): ${e.verdict}`);
 }
+
+// The scorecard: every post's first 48 hours against its account's median, and the rules that
+// follow (dropped formats and hook types are refused below; winners get 3+ posts).
+console.log(`${scoreAll()} posts scored`);
+const scores = rulesFor(tiktokIds);
 
 // 1. Research, once per brand, in a logged-out browser profile.
 const research = {};
@@ -152,7 +159,8 @@ const groups = groupAccounts(accounts, styles);
 const inventory = Object.fromEntries(brands.map((pid) => [pid, visualInventory(pid)]));
 // Days off get no posts: the plan and its checks only see the posting days.
 const postDays = week.days.filter((d) => !isDayOff(d));
-const base = { projects, briefs, research, styles, days: postDays, recentHooks: hooks, week: week.id, recentPosts: recent, experiments, inventory };
+const base = { projects, briefs, research, styles, days: postDays, recentHooks: hooks, week: week.id, recentPosts: recent, experiments, inventory,
+  scorecard: scorecardLines(Object.fromEntries(accounts.map((a) => [a.id, scores[a.id]]))) };
 const plans = [];
 const failedGroups = [];
 for (const [group, members] of groups) {
@@ -169,7 +177,7 @@ if (!plans.length) await fail(`no group could be planned — ${failedGroups.join
 
 // 4. Validate; one repair pass for every account-day without a valid post.
 const pinned = new Map(reg.accounts.filter((a) => a.post_time).map((a) => [a.id, a.post_time]));
-const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: postDays, fixed, pinned };
+const vctx = { projects, recentHooks: hooks, recentVisuals: recent.map((r) => r.visual).filter(Boolean), days: postDays, fixed, pinned, dropped: droppedSets(scores) };
 let checked = validateWeek(plans, vctx).plans;
 for (const [group, members] of groups) {
   const gaps = validateWeek(checked, vctx).gaps.filter((g) => members.some((m) => m.id === g.account));
@@ -247,7 +255,15 @@ const trendLines = Object.entries(research).flatMap(([pid, r]) => [
   ...(r.summary?.sounds ?? []).slice(0, 3).map((s) => `🎵 ${pid}: ${s.name}${s.business_safe === false ? " (not for business accounts)" : ""} — ${s.url ?? ""}`),
   ...(r.summary?.trends_to_leverage ?? []).slice(0, 3).map((t) => `📈 ${pid}: ${t.name} — ${t.how_to_use}${t.use_by ? ` (by ${t.use_by})` : ""}`),
 ]);
+// Winners the plan gave fewer than 3 posts: said, not refused (a plan short of them still posts).
+const winnerNotes = final.plans.flatMap((p) => (scores[p.account]?.winners ?? []).map((w) => {
+  const n = p.posts.filter((x) => x.status !== "invalid" && (w.dim === "format" ? family(x.format) === w.name : norm(x.hook_type) === w.name)).length;
+  return n < 3 ? `🏆 ${p.account}: winner ${w.dim === "format" ? "format" : "hook type"} "${w.name}" (${w.ratio}x) got only ${n} post(s)` : null;
+})).filter(Boolean);
+const scoreNotes = accounts.flatMap((a) => (scores[a.id]?.dropped ?? []).map((d) => `🚫 ${a.id}: ${d.dim === "format" ? "format" : "hook type"} "${d.name}" dropped until ${d.until}`));
 const notes = [
+  ...scoreNotes,
+  ...winnerNotes,
   ...final.plans.filter((p) => p.experiment?.hypothesis).map((p) => `🧪 ${p.account}: ${p.experiment.hypothesis}`),
   ...noExperiment.map((x) => `⚠️ experiment incomplete: ${x}`),
   ...writeFailed.map((x) => `❌ not saved: ${x}`),

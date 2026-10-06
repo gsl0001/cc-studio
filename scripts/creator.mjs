@@ -21,6 +21,7 @@ import { lifecycle } from "../src/log.js";
 import { loadRegistry } from "../src/registry.js";
 import { notify } from "../src/telegram.js";
 import { duePosts, nextVideo, relocateFinal, sendForReview, setPost } from "./posts.mjs";
+import { tryAutoApprove } from "./autoapprove.mjs";
 import { ROOT, config, model, projectWorkspace, rootPath, tool } from "../src/config.js";
 
 export const LOCK = "CREATOR_RUNNING";
@@ -156,7 +157,10 @@ if (import.meta.filename === process.argv[1]) {
       } else {
         if (sim?.near_duplicate) setPost(p.key, "rendered", { note: `⚠ still ${pct}% like ${like} after ${runs} tries. ${made.note ?? ""}`.trim() });
         else if (!sim) setPost(p.key, "rendered", { note: `⚠ similarity not checked. ${made.note ?? ""}`.trim() });
-        await sendForReview(p.key, "🎬 New video");
+        // A proven format made cleanly goes out on its own (held 6 h, with a Stop button);
+        // the next video starts at once. Anything else waits for your review.
+        if (await tryAutoApprove(p.key, sim)) redo = true;
+        else await sendForReview(p.key, "🎬 New video");
       }
     }
     // Approved (or further) before this run even exited: the user reviewed it in cc already.
@@ -174,5 +178,5 @@ if (import.meta.filename === process.argv[1]) {
   } finally {
     rmSync(LOCK, { force: true });
   }
-  if (redo) nextVideo();   // the remake starts now, once this run's lock is gone
+  if (redo) nextVideo();   // the remake (or, after an auto-approval, the next post) starts now, once this run's lock is gone
 }

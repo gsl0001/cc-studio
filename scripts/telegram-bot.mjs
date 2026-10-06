@@ -6,6 +6,8 @@
 //   "next"                     -> start the next video (after a blocked or failed run)
 //   "status"                   -> what is waiting, blocked and queued
 //   "pause" / "resume"         -> create / remove STOP_AUTOMATION
+//   ⛔ Stop / "stop <key>"      -> an auto-approved post comes back to you (scripts/autoapprove.mjs)
+//   "auto off" / "auto on"     -> every video comes to you / proven ones go out on their own
 //   a video (reply to a clip request) -> into the clip library; the post is remade with it
 //   any other photo, screenshot, video -> a project's assets ("acme <what it shows>" as caption)
 //   anything else              -> cc: the same chat as on the desktop (its commands and Claude),
@@ -21,9 +23,10 @@ import { niceWhen, pause, pauseEnd } from "../src/pause.js";
 import { db, log } from "../src/db.js";
 import { lifecycle, note } from "../src/log.js";
 import { channel, sendVideo, tg } from "../src/telegram.js";
-import { decide, nextVideo as next, resolveHandoff, setPost } from "./posts.mjs";
+import { decide, nextVideo as next, resolveHandoff, sendForReview, setPost } from "./posts.mjs";
 import { fulfil, openRequests, skipRequest } from "./clips.mjs";
 import { ingest, workspaces } from "./assets.mjs";
+import { OFF as AUTO_OFF, stopAuto } from "./autoapprove.mjs";
 import { spawn } from "node:child_process";
 import { mkdirSync, openSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -157,6 +160,12 @@ async function takeAssets(batch, project = projectIn(batch.caption).project) {
   return say(`${name}'s assets: ${lines.join(" ")}\n${single && note ? "Your caption is its description." : "Claude describes them in a few minutes."} The creator can use ${single ? "it" : "them"} from the next video.`
     + (openRequests().length ? "\n(If this was for a clip request, send it as a reply to that request.)" : ""));
 }
+// Stop on an auto-approved post: a held one comes back to you as a normal review.
+async function stopped(key) {
+  const msg = stopAuto(key);
+  await say(msg);
+  if (/back with you/.test(msg)) await sendForReview(key, "⛔ Stopped, your call");
+}
 const keyIn = (text) => /KEY: (\S+)/.exec(text ?? "")?.[1] ?? null;
 const cutIn = (text) => /CUT: (\d+)/.exec(text ?? "")?.[1] ?? null;
 
@@ -183,6 +192,10 @@ async function handle(u) {
       await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
       const b = ccButtons.get(key);
       return b?.assets ? takeAssets(b.assets, cut) : say("That button is from before a restart; send the files again.");
+    }
+    if (verdict === "stop") {
+      await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
+      return stopped(key);
     }
     if (verdict === "posted" || verdict === "retry") {
       await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
@@ -211,6 +224,10 @@ async function handle(u) {
   if (word === "pause") { writeFileSync("STOP_AUTOMATION", `paused from Telegram ${new Date().toISOString()}\n`); return say("⏸ Paused: nothing renders or publishes until you send \"resume\". A render already running finishes; approvals still go into the queue."); }
   const timed = /^pause\s+(.+)$/.exec(word), until = timed && pauseEnd(timed[1]);
   if (until) { pause("Telegram", until); return say(`⏸ Paused until ${niceWhen(until)}. Then everything starts again on its own, and I'll tell you here. Send "resume" to end it sooner.`); }
+  if (word === "auto off") { writeFileSync(AUTO_OFF, `off from Telegram ${new Date().toISOString()}\n`); return say("Auto-approval is off: every video comes to you again. \"auto on\" turns it back on."); }
+  if (word === "auto on") { rmSync(AUTO_OFF, { force: true }); return say("Auto-approval is on: proven formats that pass the checks go out on their own (held 6 hours, with a Stop button)."); }
+  const stopWord = /^stop\s+(\S+-\d{4}-\d{2}-\d{2}-\d{3})$/.exec(word);
+  if (stopWord) return stopped(stopWord[1]);
   if (word === "resume") { rmSync("STOP_AUTOMATION", { force: true }); next(); return say("▶️ Resumed."); }
   const replied = m.reply_to_message?.caption ?? m.reply_to_message?.text;
   const key = keyIn(replied);

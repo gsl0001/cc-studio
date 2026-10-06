@@ -2,7 +2,7 @@
 // cheap checks and starts long work detached, so any interruption (reboot, sleep, a
 // killed run, a lost Telegram message) is picked up on the next beat:
 //   1. queue approved videos, mark the ones TikTok has, report jobs a human must check
-//   2. once a day: login check on every account
+//   2. once a day: login check on every account, then the TikTok canary (scripts/canary.mjs)
 //   3. Sunday: if Saturday's plan for next week never landed, rerun insights + strategist
 //   4. a video waiting for your answer: remind every 6 hours; otherwise, if nothing is
 //      rendering, start the creator on the next planned post
@@ -19,6 +19,7 @@ import { decide, relocateFinal, schedule, sendForReview, sendHandoff } from "./p
 import { sweepInbox } from "./clips.mjs";
 import { stock, stockLine, workspaces } from "./assets.mjs";
 import { creatorRunning, nextPost, QUOTA } from "./creator.mjs";
+import { digest } from "./autoapprove.mjs";
 
 lifecycle();
 rotateTaskLogs();
@@ -104,6 +105,21 @@ if ((existsSync(AUTH) ? readFileSync(AUTH, "utf8") : "") !== today && !metricsBu
   writeFileSync("METRICS_RUNNING", String(process.pid));
   try { spawnSync(process.execPath, ["src/authcheck.js", "all"], { stdio: "inherit", timeout: 10 * 60_000 }); }
   finally { rmSync("METRICS_RUNNING", { force: true }); }
+}
+// Then the TikTok canary: the real upload path on a test video, stopped before Schedule,
+// so a TikTok UI change is caught the day it lands (it holds METRICS_RUNNING itself).
+const CANARY = "logs/.canary-day";
+if ((existsSync(CANARY) ? readFileSync(CANARY, "utf8") : "") !== today && !uploading && !(existsSync("METRICS_RUNNING") && ageMs("METRICS_RUNNING") < 3 * HOUR)) {
+  writeFileSync(CANARY, today);
+  detached("scripts/canary.mjs");
+  tell("Starting the daily TikTok check.");
+}
+
+// The morning digest of auto-approved posts, once a day from 8 am.
+const DIGEST = "logs/.digest-day";
+if (new Date().getHours() >= 8 && (existsSync(DIGEST) ? readFileSync(DIGEST, "utf8") : "") !== today) {
+  writeFileSync(DIGEST, today);
+  if (await digest()) tell("Sent the auto-approval digest.");
 }
 
 // 3. A lost Saturday (PC off, quota, crash): the plan for next week must exist by Sunday.

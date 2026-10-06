@@ -14,6 +14,7 @@ const agentDoc = (name) => { const f = rootPath(config.paths[name]); return exis
 const EXAMPLE_POST = {
   day: "YYYY-MM-DD", post_at: "HH:MM", time_reason: "which data picked this time", pillar: "the feature or theme", format: "...",
   visual: "the ONE primary screen, footage or real-world scene this post is built on",
+  hook_type: "specific stakes | pain question | category reframe | numbered roundup | direct callout | other",
   hook: { text: "on-screen payoff text for second 1", first_frame_motion: "what is moving in the first frame" },
   script: [{ start: 0, end: 2, visual: "...", voiceover: "...", overlay: "..." }],
   duration_s: 15, caption: "...", hashtags: ["#..."], search_keywords: ["..."], cta: "...",
@@ -22,7 +23,7 @@ const EXAMPLE_POST = {
   backups: [{ hook: "...", angle: "...", caption: "..." }, { hook: "...", angle: "...", caption: "..." }],
 };
 
-function contextBlock({ accounts, projects, briefs, research, styles, recentHooks, busy, recentPosts = [], experiments = [], inventory = {} }) {
+function contextBlock({ accounts, projects, briefs, research, styles, recentHooks, busy, recentPosts = [], experiments = [], inventory = {}, scorecard = "" }) {
   const brands = [...new Set(accounts.map((a) => a.project))];
   return `${agentDoc("guidelines")}
 
@@ -45,6 +46,9 @@ ${recentPosts.length ? recentPosts.map((r) => `- ${r.account} ${r.day} | ${r.for
 
 LAST EXPERIMENTS AND RESULTS (build on these; never rerun a test that already has a winner):
 ${experiments.length ? experiments.map((e) => `- ${e.account} ${e.week}: "${e.hypothesis}" (control: ${e.control_desc}; variant: ${e.variant_desc}) -> control ${e.control.avg_views ?? "?"} avg views (n=${e.control.n}), variant ${e.variant.avg_views ?? "?"} (n=${e.variant.n}): ${e.verdict}`).join("\n") : "(none yet)"}
+
+SCORECARD (views in each post's first 48 hours against its account's median; DROPPED is refused in code, WINNERs get at least 3 posts this week):
+${scorecard || "(no scores yet)"}
 
 REAL SCREENS AND FOOTAGE PER BRAND (visuals should come from these or from scenes the creator can film or build; the creator never invents app UI; prefer the [unused] ones, and avoid anything used in the last two weeks):
 ${Object.entries(inventory).map(([pid, files]) => `${pid}: ${files.length ? files.join(", ") : "(none listed)"}`).join("\n") || "(none)"}
@@ -69,6 +73,8 @@ function rulesBlock({ accounts, projects }) {
 - references: only URLs that appear in RESEARCH; [] if none.
 - Distinct posts (checked in code; a failing post is sent back): every post names its "visual", the ONE primary screen, footage or scene it is built on. No two posts in this plan (any account) share a visual, and none reuses a visual from RECENT POSTS. Name a visual by its file from REAL SCREENS AND FOOTAGE when it is one (files are compared by name), otherwise describe the scene. Per account, at most ${MAX_FORMAT} posts share a format family and at most ${MAX_SAME} share a pillar (compared by the part before any ":" or "("). Vary the layout too: full-bleed footage, split screen, before/after, list, POV, kinetic type, talking head, screen demo.
 - Experiments, always: every account runs exactly ONE experiment this week that changes a single variable (hook type, format, length, first-frame motion, CTA, posting time, sound, caption style...). Fill experiment with hypothesis, control, variant and a measurable success_metric (e.g. "avg views", "3s hold"). Every post sets experiment_arm "control" or "variant", alternating day by day, with at least 2 posts in each arm. Use LAST EXPERIMENTS: keep a winner as the new default and test something new; repeat an inconclusive test only with a sharper difference.
+- hook_type: which of the GUIDELINES hook types the hook is (exactly one of the names in the example), so the scorecard can rank them.
+- Scorecard: never plan a DROPPED format or hook type for that account; give each WINNER at least 3 of the account's posts this week (it may also be the experiment's control).
 - is_aigc: true when the video will show realistic AI-generated people or scenes or a cloned real voice; false for TTS over real footage, screen recordings or motion graphics. When unsure, true.
 - backups: exactly 2 alternates with a different angle each.
 - rationale: cite the data behind the post.`;
