@@ -1,7 +1,8 @@
 // The clip library: real footage for a scene before anything is generated. It looks in the
 // library first (clips already downloaded or added by hand), then in free stock libraries
-// (Pexels and Pixabay; both allow commercial use without credit), downloads what fits into
-// the library, and prints each clip with a frame to look at.
+// (Pexels and Pixabay with free keys; Wikimedia Commons' public-domain clips and NASA's video
+// library with no key at all; all free for commercial use without credit), downloads what
+// fits into the library, and prints each clip with a frame to look at.
 //
 //   node scripts/clips.mjs find "<what the scene shows>" [--seconds 4] [--count 3] [--project gola]
 //   node scripts/clips.mjs used <clip file> <post key>     record a use (keeps reuse down)
@@ -9,9 +10,10 @@
 //   node scripts/clips.mjs list
 //
 // Keys (free): PEXELS_API_KEY (pexels.com/api), PIXABAY_API_KEY (pixabay.com/api/docs), in
-// .env or the environment. Without them it searches the library only.
+// .env or the environment. Without them it still searches the library, Wikimedia Commons
+// and NASA.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(import.meta.filename), "..");   // the library is the repo's, whatever folder this runs from
@@ -70,6 +72,39 @@ async function pixabay(query, n) {
   }).filter(Boolean);
 }
 
+// Wikimedia Commons: only public-domain and CC0 files (no credit, no share-alike), at most 80 MB.
+const UA = { "user-agent": "cc-studio clip library (https://github.com/gsl0001/cc-studio)" };
+async function wikimedia(query, n) {
+  const u = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6"
+    + `&gsrlimit=${Math.max(10, n * 3)}&gsrsearch=${encodeURIComponent(`filetype:video ${query}`)}`
+    + "&prop=imageinfo&iiprop=url%7Csize%7Cextmetadata&iiextmetadatafilter=LicenseShortName%7CArtist%7CImageDescription";
+  const r = await fetch(u, { headers: UA });
+  if (!r.ok) throw new Error(`Wikimedia ${r.status}`);
+  const strip = (h) => String(h ?? "").replace(/<[^>]+>/g, "").trim();
+  return Object.values((await r.json()).query?.pages ?? {}).map((p) => {
+    const i = p.imageinfo?.[0], lic = strip(i?.extmetadata?.LicenseShortName?.value);
+    if (!i?.url || !/^(public domain|cc0|pd\b|pdm)/i.test(lic) || i.size > 80 * 1024 * 1024) return null;
+    return { id: `wikimedia-${p.pageid}`, source: "Wikimedia Commons", page: i.descriptionurl, author: strip(i.extmetadata?.Artist?.value).slice(0, 80),
+      duration: i.duration ? Math.round(i.duration * 10) / 10 : null, width: i.width, height: i.height, link: i.url,
+      tags: `${p.title.replace(/^File:|\.[a-z0-9]+$/gi, "")} ${strip(i.extmetadata?.ImageDescription?.value).slice(0, 200)}`, license: `${lic}: free to use, no credit required` };
+  }).filter(Boolean);
+}
+// NASA's image and video library: public domain (no NASA logo or endorsement implied).
+async function nasa(query, n) {
+  const r = await fetch(`https://images-api.nasa.gov/search?media_type=video&q=${encodeURIComponent(query)}`);
+  if (!r.ok) throw new Error(`NASA ${r.status}`);
+  const out = [];
+  for (const it of ((await r.json()).collection?.items ?? []).slice(0, n)) {
+    const d = it.data?.[0];
+    const files = await fetch(it.href).then((x) => x.json()).catch(() => []);
+    const link = ["~medium.mp4", "~large.mp4", "~mobile.mp4"].map((k) => files.find((f) => f.endsWith(k))).find(Boolean);
+    if (d && link) out.push({ id: `nasa-${d.nasa_id}`.slice(0, 80), source: "NASA", page: `https://images.nasa.gov/details/${encodeURIComponent(d.nasa_id)}`, author: d.center ?? "NASA",
+      duration: null, width: null, height: null, link: link.replace(/^http:/, "https:"), tags: `${d.title} ${(d.keywords ?? []).join(" ")}`,
+      license: "NASA media: public domain, no credit required; don't use NASA logos or imply endorsement" });
+  }
+  return out;
+}
+
 function thumb(file, duration) {
   mkdirSync(THUMBS, { recursive: true });
   const out = join(THUMBS, `${basename(file, extname(file))}.jpg`);
@@ -94,19 +129,33 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
   const errors = [];
   if (picks.length < count) {
     const found = [];
-    for (const src of [pexels, pixabay]) found.push(...await src(query, 10).catch((e) => { errors.push(e.message); return []; }));
+    for (const src of [pexels, pixabay, wikimedia, nasa]) {   // in this order: the best footage first
+      if (found.filter((c) => !c.duration || c.duration >= seconds).length >= count * 3) break;
+      found.push(...await src(query, src === nasa ? 3 : 10).catch((e) => { errors.push(e.message); return []; }));
+    }
     const seen = new Set(all.map((e) => e.id));
-    for (const c of found.filter((c) => c.duration >= seconds && !seen.has(c.id)).sort((a, b) => (b.height >= b.width) - (a.height >= a.width))) {
+    const order = (c) => ["Pexels", "Pixabay", "Wikimedia Commons", "NASA"].indexOf(c.source) * 2 + (c.height >= c.width ? 0 : 1);
+    for (const c of found.filter((c) => (!c.duration || c.duration >= seconds) && !seen.has(c.id)).sort((a, b) => order(a) - order(b))) {
       if (picks.length >= count) break;
-      const file = join(DIR, `${c.id}.mp4`);
+      const file = join(DIR, `${c.id.replace(/[^\w.-]+/g, "_")}.mp4`);
       try {
-        const r = await fetch(c.link);
+        const r = await fetch(c.link, { headers: UA });
         if (!r.ok) throw new Error(`download ${r.status}`);
+        if (Number(r.headers.get("content-length")) > 80 * 1024 * 1024) { r.body?.cancel(); continue; }
         const buf = Buffer.from(await r.arrayBuffer());
         if (buf.length > 80 * 1024 * 1024) continue;
         mkdirSync(DIR, { recursive: true });
-        writeFileSync(file, buf);
+        const ext = (/\.(\w{2,4})(?:\?|$)/.exec(c.link)?.[1] ?? "mp4").toLowerCase();
+        if (ext === "mp4") writeFileSync(file, buf);
+        else {   // .ogv/.webm from Wikimedia: an H.264 mp4 every composer can use
+          const raw = `${file}.${ext}`;
+          writeFileSync(raw, buf);
+          try { execFileSync("ffmpeg", ["-v", "error", "-y", "-i", raw, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-an", file]); }
+          finally { rmSync(raw, { force: true }); }
+        }
       } catch (e) { errors.push(`${c.id}: ${e.message}`); continue; }
+      Object.assign(c, Object.fromEntries(Object.entries(probe(file)).filter(([, v]) => v)));
+      if (c.duration && c.duration < seconds) { rmSync(file, { force: true }); continue; }
       const { link, ...meta } = c;
       const entry = { ...meta, file, query, added: new Date().toISOString(), used: [] };
       all.push(entry); seen.add(c.id);

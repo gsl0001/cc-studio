@@ -85,8 +85,9 @@ the new commands are found. To check everything at once later, run `npm run doct
 - An **ElevenLabs** API key ([elevenlabs.io](https://elevenlabs.io), Profile > API keys) for
   spoken voiceovers and music. Without it, videos use on-screen text and your own music.
 - Free **Pexels** and **Pixabay** API keys ([pexels.com/api](https://www.pexels.com/api/),
-  [pixabay.com/api/docs](https://pixabay.com/api/docs/)) for real stock footage. Before
-  generating any scene, the creator checks your clip library and then these free sources.
+  [pixabay.com/api/docs](https://pixabay.com/api/docs/)) for more stock footage. Before
+  generating any scene, the creator checks your clip library, then these, then Wikimedia
+  Commons' public-domain clips and NASA's video library, which need no key.
 
 **Which systems?** Everything works on **Windows 10 and 11**. On macOS and Linux the
 pipeline runs (with cron instead of Task Scheduler), but cc, the desktop companion, is

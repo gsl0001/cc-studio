@@ -57,8 +57,9 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
   1. Real product screens, photos and recorded takes from the workspace.
   2. The clip library, **before generating anything**: from `{{ROOT}}` run
      `node scripts/clips.mjs find "<what the scene shows, in plain words>" --seconds <n> --project PROJECT`.
-     It searches the library, then free stock footage (Pexels, Pixabay; free for commercial
-     use, no credit needed), downloads what fits and prints each clip with a frame. **Look at
+     It searches the library, then free stock footage (Pexels and Pixabay when their keys are
+     set, Wikimedia Commons' public-domain clips and NASA's library always; all free for
+     commercial use, no credit needed), downloads what fits and prints each clip with a frame. **Look at
      the frames**; use a clip only if it really shows the scene, and try other words once if
      nothing fits. For each clip you use, run `node scripts/clips.mjs used <clip file> KEY`
      and list it (source and page) in the post package. Avoid clips marked as used by this

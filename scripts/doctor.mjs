@@ -49,7 +49,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
 } else warn("Telegram", "not configured: approvals only in cc's chat. run: npm run setup to add a bot");
 [process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean).length
   ? ok("Stock footage", [process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean).join(", "))
-  : warn("Stock footage", "no PEXELS_API_KEY or PIXABAY_API_KEY: the creator only searches your own clip library before generating scenes (free keys: pexels.com/api, pixabay.com/api/docs)");
+  : warn("Stock footage", "no PEXELS_API_KEY or PIXABAY_API_KEY: the creator still finds public-domain clips on Wikimedia Commons and NASA, but Pexels and Pixabay have far more (free keys: pexels.com/api, pixabay.com/api/docs)");
 process.env.ELEVENLABS_API_KEY ? ok("ElevenLabs key") : warn("ElevenLabs", "no ELEVENLABS_API_KEY: videos get no voiceover or generated music");
 
 // cc (Windows)
