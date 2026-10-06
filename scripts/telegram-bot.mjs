@@ -6,6 +6,7 @@
 //   "next"                     -> start the next video (after a blocked or failed run)
 //   "status"                   -> what is waiting, blocked and queued
 //   "pause" / "resume"         -> create / remove STOP_AUTOMATION
+//   a video (reply to a clip request) -> into the clip library; the post is remade with it
 //   anything else              -> cc: the same chat as on the desktop (its commands and Claude),
 //                                 its buttons as Telegram buttons, videos sent here
 // Only messages from the configured chat count. Keep exactly one copy running: Telegram
@@ -20,6 +21,10 @@ import { db, log } from "../src/db.js";
 import { lifecycle, note } from "../src/log.js";
 import { channel, sendVideo, tg } from "../src/telegram.js";
 import { decide, nextVideo as next, resolveHandoff, setPost } from "./posts.mjs";
+import { fulfil, openRequests, skipRequest } from "./clips.mjs";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as pjoin } from "node:path";
 
 const chatId = channel()?.chatId;
 if (!chatId) { console.error("Telegram not configured: set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env (npm run setup)"); process.exit(1); }
@@ -64,6 +69,35 @@ async function ccTap(q, id) {
   const r = await fetch(`${DESK}/api/widget/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b.act) }).then((x) => x.json()).catch(() => null);
   return say(r ? r.message ?? r.error ?? "Done." : "cc's desk isn't answering right now.");
 }
+// A clip request answered (or given up on): when it was the post's last open one, the post
+// goes back to the creator with a note naming the clips (or saying to make the scene another way).
+function afterClip(done, skipped = false) {
+  const r = done.request;
+  if (!r.key || !done.lastForPost) return say(skipped ? "OK, no clip for that one." : `Got it: in the library as "${r.query}".`);
+  const note = skipped ? `No clip came for "${r.query}": make that scene another way (generate it, or choose a different visual).`
+    : `Use these clips from the library: ${done.clips.map((c) => `${c.file} (for: ${c.query})`).join("; ")}.`;
+  const msg = decide(r.key, "redo", note, null, "Telegram");
+  next();
+  return say(skipped ? `OK, ${r.key} will be made without it.\n${msg}` : `Got it: in the library as "${r.query}". Remaking ${r.key} with it.\n${msg}`);
+}
+async function clipArrived(m) {
+  const v = m.video ?? (m.document?.mime_type?.startsWith("video/") ? m.document : null);
+  if (!v) return false;
+  const id = /CLIP: (\w+)/.exec(m.reply_to_message?.text ?? "")?.[1] ?? (openRequests().length === 1 ? openRequests()[0].id : null);
+  if (!id) { await say(openRequests().length ? "Which request is this for? Send it as a reply to that request's message." : "There's no clip request open. To keep a clip anyway, add it on the PC: node scripts/clips.mjs add <file> \"<what it shows>\""); return true; }
+  if ((v.file_size ?? 0) > 20 * 1024 * 1024) { await say("That's over 20 MB, more than Telegram lets a bot download. Save it into the clip library's inbox folder on the PC instead (library/clips/inbox); it's picked up within half an hour."); return true; }
+  const f = await tg("getFile", { file_id: v.file_id });
+  const r = await fetch(`https://api.telegram.org/file/bot${channel().token}/${f.file_path}`);
+  if (!r.ok) throw new Error(`download ${r.status}`);
+  const dir = pjoin(tmpdir(), "cc-clips"); mkdirSync(dir, { recursive: true });
+  const tmp = pjoin(dir, `${id}${/\.\w+$/.exec(f.file_path)?.[0] ?? ".mp4"}`);
+  writeFileSync(tmp, Buffer.from(await r.arrayBuffer()));
+  const done = fulfil(id, tmp);
+  rmSync(tmp, { force: true });
+  if (!done) { await say("That request is already answered or closed."); return true; }
+  await afterClip(done);
+  return true;
+}
 const keyIn = (text) => /KEY: (\S+)/.exec(text ?? "")?.[1] ?? null;
 const cutIn = (text) => /CUT: (\d+)/.exec(text ?? "")?.[1] ?? null;
 
@@ -80,6 +114,11 @@ async function handle(u) {
     if (String(q.message?.chat?.id) !== chatId) return;
     const [verdict, key, cut = null] = q.data.split(":");
     await tg("answerCallbackQuery", { callback_query_id: q.id }).catch(() => {});
+    if (verdict === "clipskip") {
+      await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
+      const done = skipRequest(key);
+      return done ? afterClip(done, true) : say("That request is already answered or closed.");
+    }
     if (verdict === "cc") { ccTap(q, key).catch((e) => say(`cc: ${e.message}`)); return; }
     if (verdict === "posted" || verdict === "retry") {
       await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
@@ -96,7 +135,9 @@ async function handle(u) {
     return;
   }
   const m = u.message;
-  if (!m?.text || String(m.chat.id) !== chatId) return;
+  if (!m || String(m.chat.id) !== chatId) return;
+  if (await clipArrived(m)) return;
+  if (!m.text) return;
   const text = m.text.trim();
   const word = text.toLowerCase();
   if (word === "status") { askCc("status", status()).catch(() => say(status())); return; }

@@ -65,7 +65,13 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
      and list it (source and page) in the post package. Avoid clips marked as used by this
      project in the last 30 days. No stock clip with a recognisable brand, logo or a person
      presented as using the product.
-  3. Only if neither has it: generated footage.{{LOCAL_MODELS}}
+  3. If nothing fits, **ask the user for the clip** instead of generating it: for each scene
+     you're missing, run `node scripts/clips.mjs request "<what the scene shows>" --key KEY --seconds <n>`
+     from `{{ROOT}}` (they get it in Telegram with search links), then
+     `node scripts/posts.mjs set KEY blocked --note "waiting for clips: <scenes>"` and stop. When
+     their clips arrive, this post comes back to you with a note naming the files (they are
+     in the library under the scene's words).
+  4. Only when the note says no clip came (the user chose "Make it without"): generated footage.{{LOCAL_MODELS}}
   Stock footage is real footage: it does not make the video AI-generated (`--aigc`).
 - {{PAID_RULE}}
 - **Audio:** {{AUDIO}}

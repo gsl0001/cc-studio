@@ -7,13 +7,17 @@
 //   node scripts/clips.mjs find "<what the scene shows>" [--seconds 4] [--count 3] [--project gola]
 //   node scripts/clips.mjs used <clip file> <post key>     record a use (keeps reuse down)
 //   node scripts/clips.mjs add <file> "<what it shows>"    put your own footage in the library
+//   node scripts/clips.mjs request "<scene>" --key <post key> [--seconds 4]
+//                                     nothing fits: ask the user (Telegram) for a clip, with
+//                                     search links; their reply lands in the library
+//   node scripts/clips.mjs requests   the requests still waiting
 //   node scripts/clips.mjs list
 //
 // Keys (free): PEXELS_API_KEY (pexels.com/api), PIXABAY_API_KEY (pixabay.com/api/docs), in
 // .env or the environment. Without them it still searches the library, Wikimedia Commons
 // and NASA.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(import.meta.filename), "..");   // the library is the repo's, whatever folder this runs from
@@ -105,6 +109,79 @@ async function nasa(query, n) {
   return out;
 }
 
+// ---------------------------------------------------------------- your own clips and requests
+// Your clips: a file you add, or one you send for a request. Non-mp4 files become H.264 mp4.
+export function addClip(src, description, extra = {}) {
+  mkdirSync(DIR, { recursive: true });
+  const id = extra.id ?? `own-${Date.now().toString(36)}`, file = join(DIR, `${id}.mp4`);
+  if (extname(src).toLowerCase() === ".mp4") copyFileSync(src, file);
+  else execFileSync("ffmpeg", ["-v", "error", "-y", "-i", src, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-an", file]);
+  const all = load(), entry = { id, source: "your own", file, tags: description, license: "yours", ...probe(file), added: new Date().toISOString(), used: [], ...extra };
+  all.push(entry); save(all);
+  return entry;
+}
+
+// A request: what the scene needs, for which post, and where to look. The user answers with a
+// clip (Telegram, or the inbox folder) or "Make it without".
+const REQUESTS = join(DIR, "requests.json"), INBOX = join(DIR, "inbox");
+const loadRequests = () => (existsSync(REQUESTS) ? JSON.parse(readFileSync(REQUESTS, "utf8")) : []);
+const saveRequests = (all) => { mkdirSync(DIR, { recursive: true }); writeFileSync(REQUESTS, JSON.stringify(all, null, 2) + "\n"); };
+export const openRequests = () => loadRequests().filter((r) => r.status === "open");
+export const searchLinks = (q) => [["Pexels", `https://www.pexels.com/search/videos/${encodeURIComponent(q)}/?orientation=portrait`],
+  ["Pixabay", `https://pixabay.com/videos/search/${encodeURIComponent(q)}/`]];
+export function requestMessage(r) {
+  return `🎬 Clip needed${r.key ? ` for ${r.key}` : ""}:\n${r.query}\n\nAt least ${r.seconds} s, vertical if you can find one. Search with the buttons, download one you like `
+    + `(free to use, no credit needed), and send it here as a reply to this message. Telegram lets bots take files up to 20 MB; for a bigger one, `
+    + `put it in ${INBOX}.\nCLIP: ${r.id}`;
+}
+async function request(query, { key = null, seconds = 3 }) {
+  const all = loadRequests(), r = { id: Date.now().toString(36), query, key, seconds, status: "open", at: new Date().toISOString() };
+  all.push(r); saveRequests(all);
+  mkdirSync(INBOX, { recursive: true });
+  try {
+    const { tg, channel } = await import("../src/telegram.js");
+    await tg("sendMessage", { chat_id: channel().chatId, text: requestMessage(r), reply_markup: { inline_keyboard: [
+      searchLinks(query).map(([name, url]) => ({ text: `Search ${name}`, url })),
+      [{ text: "Make it without", callback_data: `clipskip:${r.id}` }]] } });
+    r.sent = true;
+  } catch (e) { r.sent = false; r.error = e.message; }
+  saveRequests(loadRequests().map((x) => (x.id === r.id ? r : x)));
+  return r;
+}
+// A clip arrived for a request: into the library under the request's words. Returns the request
+// and, when it was the post's last open request, every clip that came for that post.
+export function fulfil(id, src) {
+  const all = loadRequests(), r = all.find((x) => x.id === id && x.status === "open");
+  if (!r) return null;
+  const entry = addClip(src, r.query, { id: `asked-${r.id}`, source: "you (requested)", request: r.id });
+  Object.assign(r, { status: "done", file: entry.file, done: new Date().toISOString() });
+  saveRequests(all);
+  const forPost = r.key ? all.filter((x) => x.key === r.key) : [r];
+  return { request: r, entry, lastForPost: !forPost.some((x) => x.status === "open"), clips: forPost.filter((x) => x.status === "done") };
+}
+export function skipRequest(id) {
+  const all = loadRequests(), r = all.find((x) => x.id === id && x.status === "open");
+  if (!r) return null;
+  Object.assign(r, { status: "skipped", done: new Date().toISOString() });
+  saveRequests(all);
+  return { request: r, lastForPost: !all.some((x) => x.key === r.key && x.status === "open") };
+}
+// Files dropped in the inbox: for the one open request (if exactly one), else plain library clips
+// named after the file. Returns what fulfil() returned for each request answered.
+export function sweepInbox() {
+  if (!existsSync(INBOX)) return [];
+  const answered = [];
+  for (const name of readdirSync(INBOX).filter((n) => /\.(mp4|mov|webm|mkv|m4v)$/i.test(n))) {
+    const f = join(INBOX, name), open = openRequests();
+    try {
+      if (open.length === 1) answered.push(fulfil(open[0].id, f));
+      else addClip(f, basename(name, extname(name)).replace(/[-_]+/g, " "));
+      rmSync(f, { force: true });
+    } catch (e) { console.log(`inbox ${name}: ${e.message}`); }
+  }
+  return answered.filter(Boolean);
+}
+
 function thumb(file, duration) {
   mkdirSync(THUMBS, { recursive: true });
   const out = join(THUMBS, `${basename(file, extname(file))}.jpg`);
@@ -186,12 +263,17 @@ if (import.meta.filename === process.argv[1]) {
   } else if (cmd === "add") {
     const [src, ...desc] = args;
     if (!src || !existsSync(src) || !desc.length) { console.error('usage: add <video file> "<what it shows>"'); process.exit(2); }
-    mkdirSync(DIR, { recursive: true });
-    const id = `own-${Date.now().toString(36)}`, file = join(DIR, `${id}${extname(src) || ".mp4"}`);
-    copyFileSync(src, file);
-    const all = load();
-    all.push({ id, source: "your own", file, tags: desc.join(" "), license: "yours", ...probe(file), added: new Date().toISOString(), used: [] });
-    save(all); console.log(`added ${file}`);
+    console.log(`added ${addClip(src, desc.join(" ")).file}`);
+  } else if (cmd === "request") {
+    const key = opt("key", null), seconds = Number(opt("seconds", 3)), query = args.join(" ").trim();
+    if (!query) { console.error('usage: request "<what the scene shows>" --key <post key> [--seconds 4]'); process.exit(2); }
+    const r = await request(query, { key, seconds });
+    console.log(r.sent ? `Asked the user in Telegram (request ${r.id}). Their clip will land in the library under "${query}".`
+      : `Saved request ${r.id}, but Telegram failed (${r.error}); the user sees it in cc ("clip requests").`);
+  } else if (cmd === "requests") {
+    const open = openRequests();
+    for (const r of open) console.log(`${r.id}  ${r.key ?? "-"}  ${r.seconds}s  ${r.query}`);
+    console.log(`${open.length} open request(s)`);
   } else if (cmd === "list") {
     const all = load();
     for (const e of all) console.log(`${basename(e.file).padEnd(28)} ${String(e.source).padEnd(9)} ${e.width}x${e.height} ${e.duration}s  ${e.tags.slice(0, 60)}  used ${e.used?.length ?? 0}x`);

@@ -15,7 +15,8 @@ import { lifecycle, note, rotateTaskLogs } from "../src/log.js";
 import { notify } from "../src/telegram.js";
 import { liftExpired } from "../src/pause.js";
 import { nextWeek } from "../auto_content_pipeline/src/schema.js";
-import { relocateFinal, schedule, sendForReview, sendHandoff } from "./posts.mjs";
+import { decide, relocateFinal, schedule, sendForReview, sendHandoff } from "./posts.mjs";
+import { sweepInbox } from "./clips.mjs";
 import { creatorRunning, nextPost, QUOTA } from "./creator.mjs";
 
 lifecycle();
@@ -26,6 +27,14 @@ if (liftExpired()) {
   log(null, "kill_switch", "cleared: the timed pause ended");
   tell("The timed pause ended; everything runs again.");
   await notify("▶️ Your pause is over: videos are being made and posted again.");
+}
+// Clips dropped in the library's inbox (too big for Telegram) answer the open request.
+for (const done of sweepInbox()) {
+  tell(`Clip for "${done.request.query}" came in through the inbox.`);
+  if (done.request.key && done.lastForPost) {
+    decide(done.request.key, "redo", `Use these clips from the library: ${done.clips.map((c) => `${c.file} (for: ${c.query})`).join("; ")}.`, null, "the inbox");
+    await notify(`🎬 Got your clip for "${done.request.query}"; remaking ${done.request.key} with it.`);
+  }
 }
 if (existsSync("STOP_AUTOMATION")) { console.log("STOP_AUTOMATION present — nothing runs."); process.exit(0); }
 const HOUR = 3_600_000;

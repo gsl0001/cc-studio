@@ -186,6 +186,7 @@ The better the material, the better the videos:
 | `cancel <account> Oct 10` | drops one video from the queue (asks first; the file stays) |
 | `caption for <account> Friday: <new caption>` | changes a caption before upload (`caption for <account> Friday` reads it) |
 | `show me Friday's videos` | plays a queued video, or lists them as buttons |
+| `clip requests` | the clips the creator asked you for, with search links (answer in Telegram by replying with the video) |
 | `no posts on Sundays`, `skip Oct 12`, `days off`, `post on Sundays again` | days off: nothing is planned or posted on them, and queued videos move to the next free day |
 | `folders`, `open <folder>` | opens the finished videos, a project's workspace, the week plans, the calendar or the latest report |
 | `post at 5pm` (or `post at 5pm for <account>`, `posting time auto`) | sets the daily posting time, after you confirm |

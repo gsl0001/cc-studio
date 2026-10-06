@@ -13,6 +13,7 @@ import { lifecycle, note, readLog } from "./log.js";
 import { ROOT, config, model, projectWorkspace, rootPath } from "./config.js";
 import { loadRegistry } from "./registry.js";
 import { niceWhen, pause, pauseEnd, pausedUntil } from "./pause.js";
+import { openRequests, searchLinks } from "../scripts/clips.mjs";
 import { dayIn, describeOff, daysOff, isDayOff, matches, niceDay, postDay, postRef, saveDaysOff, weekdayIn, weekdayName } from "./controls.js";
 import { decide, nextVideo, resolveHandoff } from "../scripts/posts.mjs";
 import { creatorRunning, nextPost } from "../scripts/creator.mjs";
@@ -724,6 +725,11 @@ function quick(text, st, via = "cc") {
       return { reply: `${js.length} videos:\n${listOf(js)}\nTap one to watch it.`, chips: js.slice(0, 8).map((j) => `watch ${accountName(j.account)} ${postDay(j)}`) };
     }
   }
+  if (/^(clip requests?|requests|what clips? (do you|does cc) need|clips? needed)$/.test(w)) {
+    const open = openRequests();
+    const one = (r) => [`${r.query} (${r.seconds}s+${r.key ? `, for ${r.key}` : ""})`, ...searchLinks(r.query).map(([n, u]) => `${n}: ${u}`)].join("\n");
+    return { reply: open.length ? `${open.map(one).join("\n\n")}\n\nSend the clip in Telegram as a reply to its request, or put it in library/clips/inbox.` : "No clip requests are waiting." };
+  }
   if (/^(days? off|what days? off|show (my )?days? off|which days (are|do i have) off)$/.test(w)) {
     const off = describeOff();
     return { reply: off.length ? `No posts on: ${off.join(", ")}.\nSay "post on Sundays again" or "unskip Oct 12" to change it.` : `No days off. Say "no posts on Sundays" or "skip Oct 12".` };
@@ -787,6 +793,7 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
 - one post: retry Acme Desk, move Friday's Acme post to Saturday 6pm, cancel Notes Oct 10,
   caption for <account> Friday: new caption, show me Friday's videos
 - days off: no posts on Sundays, skip Oct 12, days off, post on Sundays again
+- clips the creator asked you for: clip requests
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;
