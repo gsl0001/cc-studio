@@ -5,6 +5,7 @@
 //
 //   node scripts/assets.mjs scan [--project <id>] [--no-describe]   catalogue new and changed files
 //   node scripts/assets.mjs sheets [--project <id>]                 contact sheets: library/sheets/
+//   node scripts/assets.mjs segments [--project <id>]               longer videos, moment by moment
 //   node scripts/assets.mjs list [--project <id>]
 //
 // Skipped: finished videos (anything posted, by checksum, and 1080x1920 renders with sound
@@ -12,7 +13,7 @@
 // catalogued once. Descriptions come from Claude looking at a contact sheet of 20 frames at a time.
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { DIR, load, save } from "./clips.mjs";
 import { config, projectWorkspace, tool } from "../src/config.js";
@@ -142,6 +143,53 @@ export function describe(only = null, { limit = Infinity, log = console.log } = 
   }
 }
 
+// Longer videos, moment by moment: up to 12 frames across the video, labelled with their time,
+// go to Claude as one sheet; it splits the video into stretches ("8-20: photos sort into jobs").
+// Each stretch is searchable on its own, so a search returns the file and the seconds to use.
+const ask = (sheet, prompt) => {
+  const msg = { type: "user", message: { role: "user", content: [
+    { type: "image", source: { type: "base64", media_type: "image/jpeg", data: readFileSync(sheet).toString("base64") } },
+    { type: "text", text: prompt }] } };
+  // One command string: claude is a .cmd shim on Windows, so it runs through the shell.
+  const r = spawnSync(`claude -p --model ${MODEL} --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --no-session-persistence`,
+    { input: JSON.stringify(msg) + "\n", encoding: "utf8", shell: true, timeout: 180_000, maxBuffer: 1 << 24 });
+  return { text: (r.stdout ?? "").split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((j) => j?.type === "result")?.result ?? "", err: r.stderr ?? "" };
+};
+export const parseSegments = (text, duration) => [...text.matchAll(/^\s*(\d+(?:\.\d+)?)\s*s?\s*[-–to]+\s*(\d+(?:\.\d+)?)\s*s?\s*[:.)-]\s*(.+)$/gm)]
+  .map((m) => ({ from: Number(m[1]), to: Math.min(Number(m[2]), duration), text: m[3].trim() }))
+  .filter((g) => g.to > g.from && g.from < duration);
+
+export function segmentVideos(only = null, { minSeconds = 5, log = console.log } = {}) {
+  const ws = workspaces();
+  let done = 0;
+  for (const e of load().filter((x) => x.kind === "asset" && x.duration > minSeconds && !x.segments && existsSync(x.file) && (!only || x.project === only) && ws[x.project])) {
+    const step = Math.max(2, e.duration / 12), dir = join(DIR, `.frames-${process.pid}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      execFileSync("ffmpeg", ["-v", "error", "-y", "-i", e.file, "-vf", `fps=1/${step.toFixed(2)},scale=480:-2`, "-frames:v", "12", join(dir, "f%02d.jpg")], { stdio: "ignore" });
+      const frames = readdirSync(dir).filter((f) => f.endsWith(".jpg")).sort();
+      if (!frames.length) continue;
+      const sheet = sheetImage(frames.map((f, i) => ({ image: join(dir, f), label: `${Math.round(i * step)}s` })), join(DIR, `.segments-${process.pid}.jpg`), 4);
+      const prompt = `These are frames from one ${e.duration}-second video (${e.description ?? "an asset"}) of ${ws[e.project].name}, in order; each tile shows the second it was taken. `
+        + "Split the video into the stretches where something different happens on screen. One line per stretch, `START-END: what happens` in seconds, 6 to 16 words, "
+        + `covering 0 to ${e.duration}. Name app screens and actions so someone can find the moment by searching. Nothing else.`;
+      const { text, err } = ask(sheet, prompt);
+      const segments = parseSegments(text, e.duration);
+      if (!segments.length) { log(`segments: no answer for ${e.rel} (${err.slice(0, 120)})`); continue; }
+      const fresh = load(), x = fresh.find((y) => y.id === e.id);
+      if (!x) continue;
+      x.segments = segments;
+      x.tags = `${x.description ?? ""} ${segments.map((g) => g.text).join(" ")} ${pathWords(x.rel ?? "")}`;
+      save(fresh);
+      done++;
+      log(`${e.rel}: ${segments.length} stretches`);
+    } finally {
+      for (const f of existsSync(dir) ? readdirSync(dir) : []) rmSync(join(dir, f), { force: true });
+    }
+  }
+  return done;
+}
+
 // Contact sheets for the creator: library/sheets/<project>-<n>.jpg (30 per sheet, least used
 // first) and <project>-<n>.txt saying which file each number is.
 export function sheets(only = null) {
@@ -174,9 +222,14 @@ if (import.meta.filename === process.argv[1]) {
   if (cmd === "scan") {
     const counts = scan(project);
     for (const [p, c] of Object.entries(counts)) console.log(`${p}: ${c.files} files, ${c.added} new, ${c.renders} finished videos skipped, ${c.copies} copies`);
-    if (!args.includes("--no-describe")) console.log(`${describe(project)} described`);
+    if (!args.includes("--no-describe")) {
+      console.log(`${describe(project)} described`);
+      console.log(`${segmentVideos(project)} longer videos described moment by moment`);
+    }
     console.log(`sheets: ${sheets(project).length}`);
     writeFileSync(join(DIR, ".last-scan"), new Date().toISOString());
+  } else if (cmd === "segments") {
+    console.log(`${segmentVideos(project)} videos described moment by moment`);
   } else if (cmd === "sheets") {
     for (const s of sheets(project)) console.log(s);
   } else if (cmd === "list") {

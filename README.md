@@ -157,7 +157,8 @@ The better the material, the better the videos:
 - Run **`npm run assets -- scan`** once (cc does it every 6 hours after that, or say
   `scan assets`). It catalogues every screen, photo and take in the workspace's material
   folders (`assets`, `clips`, `ui`, `photos`, `footage`, ...), has Claude describe each in a
-  line, and makes contact sheets in `library/sheets/`. The creator then finds your material
+  line (longer videos stretch by stretch, so a search returns the seconds to use), and makes
+  contact sheets in `library/sheets/`. The creator then finds your material
   by meaning before anything else, the planner plans from what exists, and the least used
   assets come first so videos keep looking different.
 - Fill in **`content/CONTEXT.md`**: who each account is for and the words people search for.
