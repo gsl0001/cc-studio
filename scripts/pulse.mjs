@@ -38,11 +38,19 @@ for (const done of sweepInbox()) {
 }
 if (existsSync("STOP_AUTOMATION")) { console.log("STOP_AUTOMATION present — nothing runs."); process.exit(0); }
 const HOUR = 3_600_000;
+// New screens, photos and takes in the workspaces get catalogued and described (scripts/assets.mjs).
+const scanMark = "library/clips/.last-scan";
+const scanAge = existsSync(scanMark) ? Date.now() - statSync(scanMark).mtimeMs : Infinity;
 const ageMs = (f) => (existsSync(f) ? Date.now() - statSync(f).mtimeMs : Infinity);
 const detached = (script, args = []) => {
   const out = openSync(`logs/${script.replace(/^.*\/|\.m?js$/g, "")}.log`, "a");
   spawn(process.execPath, [script, ...args], { detached: true, windowsHide: true, stdio: ["ignore", out, out] }).unref();
 };
+if (scanAge > 6 * HOUR && existsSync("library/clips")) {
+  writeFileSync(scanMark, new Date().toISOString());   // marked now, so the next pulse doesn't start a second scan
+  detached("scripts/assets.mjs", ["scan"]);
+  tell("Rescanning the workspaces for new assets.");
+}
 
 // 0. The Telegram bot is how approvals arrive: restart it if its heartbeat is stale
 // (it writes one every poll, at most ~50 s apart).

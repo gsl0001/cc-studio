@@ -21,7 +21,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
 import { basename, dirname, extname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(import.meta.filename), "..");   // the library is the repo's, whatever folder this runs from
-const DIR = join(ROOT, "library", "clips"), INDEX = join(DIR, "index.json"), THUMBS = join(DIR, "thumbs");
+export const DIR = join(ROOT, "library", "clips"), INDEX = join(DIR, "index.json"), THUMBS = join(DIR, "thumbs");
 const REUSE_DAYS = 30;   // a clip this project used more recently ranks last
 
 // .env -> process.env, without overriding what is already set
@@ -34,8 +34,8 @@ const STOP = new Set("a an the and or of in on at to for with by from is are be 
 export const words = (s) => [...new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
   .filter((w) => w.length > 1 && !STOP.has(w)).map((w) => w.replace(/(ies)$/, "y").replace(/([^s])s$/, "$1")))];
 
-const load = () => (existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : []);
-const save = (all) => { mkdirSync(DIR, { recursive: true }); writeFileSync(INDEX, JSON.stringify(all, null, 2) + "\n"); };
+export const load = () => (existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : []);
+export const save = (all) => { mkdirSync(DIR, { recursive: true }); writeFileSync(INDEX, JSON.stringify(all, null, 2) + "\n"); };
 
 // How well a library clip fits the words: the share of the query's words it carries.
 export function score(entry, query) {
@@ -182,7 +182,7 @@ export function sweepInbox() {
   return answered.filter(Boolean);
 }
 
-function thumb(file, duration) {
+export function thumb(file, duration) {
   mkdirSync(THUMBS, { recursive: true });
   const out = join(THUMBS, `${basename(file, extname(file))}.jpg`);
   if (!existsSync(out)) {
@@ -190,7 +190,7 @@ function thumb(file, duration) {
   }
   return out;
 }
-const probe = (file) => {
+export const probe = (file) => {
   try {
     const [w, h, d] = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "csv=p=0:s=,", file])
       .toString().split(/[,\r\n]+/).map(Number);
@@ -201,8 +201,10 @@ const probe = (file) => {
 async function find(query, { seconds = 3, count = 3, project = null }) {
   const all = load();
   const fits = (e) => !e.duration || e.duration >= seconds;
-  let picks = all.filter((e) => existsSync(e.file) && fits(e)).map((e) => ({ e, s: score(e, query) })).filter((x) => x.s >= 0.5)
-    .sort((a, b) => recentlyUsed(a.e, project) - recentlyUsed(b.e, project) || b.s - a.s).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
+  const own = (e) => (e.kind === "asset" ? 0 : 1);   // the project's own screens, photos and takes before any stock
+  let picks = all.filter((e) => existsSync(e.file) && fits(e) && (e.kind !== "asset" || !project || e.project === project))
+    .map((e) => ({ e, s: score(e, query) })).filter((x) => x.s >= 0.5)
+    .sort((a, b) => own(a.e) - own(b.e) || recentlyUsed(a.e, project) - recentlyUsed(b.e, project) || b.s - a.s).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
   const errors = [];
   if (picks.length < count) {
     const found = [];
@@ -253,7 +255,7 @@ if (import.meta.filename === process.argv[1]) {
     if (!query) { console.error('say what the scene shows: node scripts/clips.mjs find "rain on a window at night"'); process.exit(2); }
     const r = await find(query, { seconds, count, project });
     if (!r.picks.length) console.log(`No clip for "${query}"${r.keys.length ? "" : " (library only: no PEXELS_API_KEY or PIXABAY_API_KEY set)"}. Try other words, or make the scene.`);
-    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height} · ${p.duration}s · ${p.tags}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
+    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
     for (const e of r.errors) console.log(`(skipped: ${e})`);
   } else if (cmd === "used") {
     const [file, key] = args, all = load(), e = all.find((x) => resolve(x.file) === resolve(file ?? ""));

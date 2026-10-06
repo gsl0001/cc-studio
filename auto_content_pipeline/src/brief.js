@@ -152,7 +152,13 @@ export function experimentReadout(accountIds, { weeks = [], dir = "auto_content_
 }
 
 // The project's real screens and footage by name, so "visual" points at things that exist.
+const CATALOGUE = new URL("../../library/clips/index.json", import.meta.url);
 export function visualInventory(project) {
+  const assets = existsSync(CATALOGUE) ? JSON.parse(readFileSync(CATALOGUE, "utf8")).filter((e) => e.kind === "asset" && e.project === project && existsSync(e.file)) : [];
+  if (assets.length) {
+    return assets.sort((a, b) => (a.used?.length ?? 0) - (b.used?.length ?? 0)).slice(0, 150)
+      .map((e) => `${e.rel.replace(/\\/g, "/")}${e.description ? ` (${e.description})` : ""}`);
+  }
   const profile = loadRegistry().projects.find((p) => p.id === project);
   const root = profile ? projectWorkspace(profile) : null;
   if (!root || !existsSync(root)) return [];

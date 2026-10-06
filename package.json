@@ -34,7 +34,8 @@
     "creator": "node scripts/creator.mjs",
     "bot": "node scripts/telegram-bot.mjs",
     "logs": "node scripts/logs.mjs",
-    "clips": "node scripts/clips.mjs"
+    "clips": "node scripts/clips.mjs",
+    "assets": "node scripts/assets.mjs"
   },
   "dependencies": {
     "playwright": "^1.50.0"

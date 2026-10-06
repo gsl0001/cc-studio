@@ -54,17 +54,21 @@ reuse their screens or footage, it comes straight back to you.
 Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
 - **Composition:** {{COMPOSITION}}. 1080x1920, 30 fps.
 - **Footage, in this order, for every scene:**
-  1. Real product screens, photos and recorded takes from the workspace.
-  2. The clip library, **before generating anything**: from `{{ROOT}}` run
+  1. **Your project's own material, first.** Every real screen, photo and take in the
+     workspace is catalogued with a one-line description. Look at the contact sheets
+     `{{ROOT}}/library/sheets/PROJECT-*.jpg` (least used first; the matching .txt says which
+     file each number is), and search by meaning from `{{ROOT}}`:
      `node scripts/clips.mjs find "<what the scene shows, in plain words>" --seconds <n> --project PROJECT`.
-     It searches the library, then free stock footage (Pexels and Pixabay when their keys are
-     set, Wikimedia Commons' public-domain clips and NASA's library always; all free for
-     commercial use, no credit needed), downloads what fits and prints each clip with a frame. **Look at
-     the frames**; use a clip only if it really shows the scene, and try other words once if
-     nothing fits. For each clip you use, run `node scripts/clips.mjs used <clip file> KEY`
-     and list it (source and page) in the post package. Avoid clips marked as used by this
-     project in the last 30 days. No stock clip with a recognisable brand, logo or a person
-     presented as using the product.
+     It returns this project's own assets first, then the clip library, then free stock
+     footage (Pexels and Pixabay when their keys are set, Wikimedia Commons' public-domain
+     clips and NASA's library always; all free for commercial use, no credit needed),
+     downloading what fits, each with a frame. **Look at the frames**; use a result only if it
+     really shows the scene, and try other words once if nothing fits.
+  2. For **every** asset or clip you use (your own or stock), run
+     `node scripts/clips.mjs used <file> KEY`: the least used come first next time, which
+     keeps videos looking different. List stock clips (source and page) in the post package.
+     Avoid anything marked as used by this project in the last 30 days. No stock clip with a
+     recognisable brand, logo or a person presented as using the product.
   3. If nothing fits, make the scene **another way with what you have** before asking anyone:
      animate the workspace's photos and screens (pan, zoom, split, before/after), motion
      graphics or kinetic type, a different visual that tells the same beat, or generated

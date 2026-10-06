@@ -154,6 +154,12 @@ The better the material, the better the videos:
 - Put your logos, app screenshots, screen recordings and photos in
   **`workspaces/<project>/assets/`**. Add brand rules (colours, fonts, words to avoid) to
   `workspaces/<project>/README.md`; the creator reads it before every video.
+- Run **`npm run assets -- scan`** once (cc does it every 6 hours after that, or say
+  `scan assets`). It catalogues every screen, photo and take in the workspace's material
+  folders (`assets`, `clips`, `ui`, `photos`, `footage`, ...), has Claude describe each in a
+  line, and makes contact sheets in `library/sheets/`. The creator then finds your material
+  by meaning before anything else, the planner plans from what exists, and the least used
+  assets come first so videos keep looking different.
 - Fill in **`content/CONTEXT.md`**: who each account is for and the words people search for.
 - Optionally edit **`content/GUIDELINES.md`**, the house rules for every video.
 
@@ -186,6 +192,7 @@ The better the material, the better the videos:
 | `cancel <account> Oct 10` | drops one video from the queue (asks first; the file stays) |
 | `caption for <account> Friday: <new caption>` | changes a caption before upload (`caption for <account> Friday` reads it) |
 | `show me Friday's videos` | plays a queued video, or lists them as buttons |
+| `scan assets` | catalogues new screens, photos and takes in the workspaces now |
 | `clip requests` | the clips the creator asked you for, with search links (answer in Telegram by replying with the video) |
 | `no posts on Sundays`, `skip Oct 12`, `days off`, `post on Sundays again` | days off: nothing is planned or posted on them, and queued videos move to the next free day |
 | `folders`, `open <folder>` | opens the finished videos, a project's workspace, the week plans, the calendar or the latest report |

@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync, statSync, createReadStream } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync, statSync, createReadStream, openSync } from "node:fs";
 import { db, log, TERMINAL } from "./db.js";
 import { lifecycle, note, readLog } from "./log.js";
 import { ROOT, config, model, projectWorkspace, rootPath } from "./config.js";
@@ -533,6 +533,7 @@ const FOLDERS = [
     { key: `work-${p.id}`, label: `${p.name ?? p.id} workspace`, path: projectWorkspace(p), also: [`${p.id} workspace`, `${(p.name ?? p.id).toLowerCase()} work`, (p.name ?? p.id).toLowerCase()] },
   ]),
   ...(config.paths.handPost ? [{ key: "hand", label: "Hand-post folder", path: rootPath(config.paths.handPost), also: ["hand finals", "hand post"] }] : []),
+  { key: "sheets", label: "Asset sheets", path: rootPath("library/sheets"), also: ["sheets", "contact sheets", "asset sheets", "assets"] },
   { key: "clips", label: "Clip library", path: rootPath("library/clips"), also: ["clips", "library", "stock", "stock clips", "footage", "clip library"] },
   { key: "weeks", label: "Week plans", path: "auto_content_pipeline/output/weeks", also: ["plans", "weeks", "week plans", "plan folder"] },
   { key: "calendar", label: "Calendar", url: "/calendar", also: ["the calendar", "week calendar"] },
@@ -725,6 +726,11 @@ function quick(text, st, via = "cc") {
       return { reply: `${js.length} videos:\n${listOf(js)}\nTap one to watch it.`, chips: js.slice(0, 8).map((j) => `watch ${accountName(j.account)} ${postDay(j)}`) };
     }
   }
+  if (/^(scan|rescan|update|refresh) (the )?(assets?|asset catalogue|library|workspaces?)$/.test(w)) {
+    const out = openSync("logs/assets-scan.log", "a");
+    spawn(process.execPath, ["scripts/assets.mjs", "scan"], { detached: true, windowsHide: true, stdio: ["ignore", out, out] }).unref();
+    return { reply: "Scanning the workspaces. New screens, photos and takes get described and added to the contact sheets in a few minutes." };
+  }
   if (/^(clip requests?|requests|what clips? (do you|does cc) need|clips? needed)$/.test(w)) {
     const open = openRequests();
     const one = (r) => [`${r.query} (${r.seconds}s+${r.key ? `, for ${r.key}` : ""})`, ...searchLinks(r.query).map(([n, u]) => `${n}: ${u}`)].join("\n");
@@ -794,6 +800,7 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
   caption for <account> Friday: new caption, show me Friday's videos
 - days off: no posts on Sundays, skip Oct 12, days off, post on Sundays again
 - clips the creator asked you for: clip requests
+- new screens or footage in a workspace: scan assets (it also runs every 6 hours)
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;
