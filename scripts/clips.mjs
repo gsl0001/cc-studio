@@ -4,7 +4,7 @@
 // library with no key at all; all free for commercial use without credit), downloads what
 // fits into the library, and prints each clip with a frame to look at.
 //
-//   node scripts/clips.mjs find "<what the scene shows>" [--seconds 4] [--count 3] [--project gola]
+//   node scripts/clips.mjs find "<what the scene shows>" [--seconds 4] [--count 3] [--project <id>]
 //   node scripts/clips.mjs used <clip file> <post key>     record a use (keeps reuse down)
 //   node scripts/clips.mjs add <file> "<what it shows>"    put your own footage in the library
 //   node scripts/clips.mjs request "<scene>" --key <post key> [--seconds 4]
