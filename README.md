@@ -161,6 +161,11 @@ The better the material, the better the videos:
   contact sheets in `library/sheets/`. The creator then finds your material
   by meaning before anything else, the planner plans from what exists, and the least used
   assets come first so videos keep looking different.
+- From your phone: send photos, screenshots or screen recordings to your Telegram bot with a
+  caption that starts with the project (`acme the settings screen, dark mode`). Each lands in
+  `workspaces/<project>/assets/telegram/`, catalogued at once with your caption as its
+  description (no caption: Claude describes it). No project named: the bot asks with buttons.
+  Telegram lets a bot download up to 20 MB; put bigger files in the assets folder on the PC.
 - Fill in **`content/CONTEXT.md`**: who each account is for and the words people search for.
 - Optionally edit **`content/GUIDELINES.md`**, the house rules for every video.
 

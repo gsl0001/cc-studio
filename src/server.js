@@ -807,6 +807,7 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
 - days off: no posts on Sundays, skip Oct 12, days off, post on Sundays again
 - clips the creator asked you for: clip requests
 - new screens or footage in a workspace: scan assets (it also runs every 6 hours); asset stock: how much is still fresh
+- new material from the phone: send photos, screenshots or videos to the Telegram bot, caption starting with the project ("acme settings screen, dark mode"); they become that project's assets
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;

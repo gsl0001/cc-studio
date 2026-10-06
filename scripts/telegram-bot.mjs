@@ -7,6 +7,7 @@
 //   "status"                   -> what is waiting, blocked and queued
 //   "pause" / "resume"         -> create / remove STOP_AUTOMATION
 //   a video (reply to a clip request) -> into the clip library; the post is remade with it
+//   any other photo, screenshot, video -> a project's assets ("acme <what it shows>" as caption)
 //   anything else              -> cc: the same chat as on the desktop (its commands and Claude),
 //                                 its buttons as Telegram buttons, videos sent here
 // Only messages from the configured chat count. Keep exactly one copy running: Telegram
@@ -22,9 +23,11 @@ import { lifecycle, note } from "../src/log.js";
 import { channel, sendVideo, tg } from "../src/telegram.js";
 import { decide, nextVideo as next, resolveHandoff, setPost } from "./posts.mjs";
 import { fulfil, openRequests, skipRequest } from "./clips.mjs";
-import { mkdirSync } from "node:fs";
+import { ingest, workspaces } from "./assets.mjs";
+import { spawn } from "node:child_process";
+import { mkdirSync, openSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join as pjoin } from "node:path";
+import { extname, join as pjoin } from "node:path";
 
 const chatId = channel()?.chatId;
 if (!chatId) { console.error("Telegram not configured: set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env (npm run setup)"); process.exit(1); }
@@ -80,23 +83,79 @@ function afterClip(done, skipped = false) {
   next();
   return say(skipped ? `OK, ${r.key} will be made without it.\n${msg}` : `Got it: in the library as "${r.query}". Remaking ${r.key} with it.\n${msg}`);
 }
-async function clipArrived(m) {
-  const v = m.video ?? (m.document?.mime_type?.startsWith("video/") ? m.document : null);
-  if (!v) return false;
-  const id = /CLIP: (\w+)/.exec(m.reply_to_message?.text ?? "")?.[1] ?? (openRequests().length === 1 ? openRequests()[0].id : null);
-  if (!id) { await say(openRequests().length ? "Which request is this for? Send it as a reply to that request's message." : "There's no clip request open. To keep a clip anyway, add it on the PC: node scripts/clips.mjs add <file> \"<what it shows>\""); return true; }
-  if ((v.file_size ?? 0) > 20 * 1024 * 1024) { await say("That's over 20 MB, more than Telegram lets a bot download. Save it into the clip library's inbox folder on the PC instead (library/clips/inbox); it's picked up within half an hour."); return true; }
-  const f = await tg("getFile", { file_id: v.file_id });
+const TOO_BIG = 20 * 1024 * 1024;   // the most Telegram lets a bot download
+async function download(fileId, name) {
+  const f = await tg("getFile", { file_id: fileId });
   const r = await fetch(`https://api.telegram.org/file/bot${channel().token}/${f.file_path}`);
   if (!r.ok) throw new Error(`download ${r.status}`);
   const dir = pjoin(tmpdir(), "cc-clips"); mkdirSync(dir, { recursive: true });
-  const tmp = pjoin(dir, `${id}${/\.\w+$/.exec(f.file_path)?.[0] ?? ".mp4"}`);
+  const tmp = pjoin(dir, `${name}${/\.\w+$/.exec(f.file_path)?.[0] ?? ".mp4"}`);
   writeFileSync(tmp, Buffer.from(await r.arrayBuffer()));
+  return tmp;
+}
+async function clipArrived(m) {
+  const v = m.video ?? (m.document?.mime_type?.startsWith("video/") ? m.document : null);
+  if (!v) return false;
+  const id = /CLIP: (\w+)/.exec(m.reply_to_message?.text ?? "")?.[1] ?? (openRequests().length === 1 && !projectIn(m.caption).project ? openRequests()[0].id : null);
+  if (!id) return false;   // not for a request: an asset
+  if ((v.file_size ?? 0) > TOO_BIG) { await say("That's over 20 MB, more than Telegram lets a bot download. Save it into the clip library's inbox folder on the PC instead (library/clips/inbox); it's picked up within half an hour."); return true; }
+  const tmp = await download(v.file_id, id);
   const done = fulfil(id, tmp);
   rmSync(tmp, { force: true });
   if (!done) { await say("That request is already answered or closed."); return true; }
   await afterClip(done);
   return true;
+}
+
+// Photos, screenshots and videos sent here (not answering a clip request) become a project's
+// assets. The caption's first word names the project ("acme settings screen, dark mode
+// St"), the rest describes it; with no project named, buttons ask. An album is asked about once,
+// and its caption becomes search words (Claude describes each item).
+const projects = () => Object.entries(workspaces()).map(([id, w]) => ({ id, name: w.name }));
+function projectIn(caption) {
+  const all = projects(), m = /^\s*([\w-]+)\s*[:,-]?\s*([\s\S]*)$/.exec(caption ?? "");
+  const p = m && all.find((x) => [x.id, x.name.toLowerCase()].includes(m[1].toLowerCase()));
+  if (p) return { project: p.id, note: m[2].trim() || null };
+  return { project: all.length === 1 ? all[0].id : null, note: caption?.trim() || null };
+}
+function mediaIn(m) {
+  const d = m.photo?.at(-1) ?? m.video ?? (/^(image|video)\//.test(m.document?.mime_type ?? "") ? m.document : null);
+  return d ? { fileId: d.file_id, size: d.file_size ?? 0, msg: m.message_id } : null;
+}
+const albums = new Map();   // media_group_id -> { files, caption }: an album arrives one message per item
+async function assetArrived(m) {
+  const media = mediaIn(m);
+  if (!media) return false;
+  const gid = m.media_group_id;
+  if (gid && albums.has(gid)) { const a = albums.get(gid); a.files.push(media); a.caption ??= m.caption; return true; }
+  const batch = { files: [media], caption: m.caption ?? null };
+  if (!gid) { await takeAssets(batch); return true; }
+  albums.set(gid, batch);
+  setTimeout(() => { albums.delete(gid); takeAssets(batch).catch((e) => say(`Couldn't add those: ${e.message}`)); }, 2500);
+  return true;
+}
+async function takeAssets(batch, project = projectIn(batch.caption).project) {
+  if (!project) {
+    const id = remember({ assets: batch }), n = batch.files.length;
+    return say(`Which project ${n > 1 ? `are these ${n}` : "is this"} for?`, { reply_markup: { inline_keyboard: [projects().map((p) => ({ text: p.name, callback_data: `asset:${id}:${p.id}` }))] } });
+  }
+  const note = projectIn(batch.caption).note, single = batch.files.length === 1, lines = [];
+  for (const f of batch.files) {
+    if (f.size > TOO_BIG) { lines.push("One is over 20 MB, more than Telegram lets a bot download: put it in the project's assets folder on the PC (cc picks it up on its next scan, or say \"scan assets\")."); continue; }
+    const tmp = await download(f.fileId, `tg-${f.msg}`);
+    try {
+      const r = ingest(project, tmp, `tg-${f.msg}${extname(tmp)}`, single ? { description: note } : { tags: note });
+      lines.push(!r ? "One was skipped: too small, or it looks like a finished video."
+        : r.dup ? `Already had that one (${r.entry.rel})${single && note ? "; its description is now yours" : ""}.`
+        : `Added ${r.entry.rel}${r.entry.duration ? ` (${r.entry.duration}s)` : ""}.`);
+    } finally { rmSync(tmp, { force: true }); }
+  }
+  // Claude describes what has no caption, splits videos into stretches and redoes the contact sheets.
+  const out = openSync("logs/assets.log", "a");
+  spawn(process.execPath, ["scripts/assets.mjs", "scan", "--project", project], { detached: true, windowsHide: true, stdio: ["ignore", out, out] }).unref();
+  const name = projects().find((p) => p.id === project)?.name ?? project;
+  return say(`${name}'s assets: ${lines.join(" ")}\n${single && note ? "Your caption is its description." : "Claude describes them in a few minutes."} The creator can use ${single ? "it" : "them"} from the next video.`
+    + (openRequests().length ? "\n(If this was for a clip request, send it as a reply to that request.)" : ""));
 }
 const keyIn = (text) => /KEY: (\S+)/.exec(text ?? "")?.[1] ?? null;
 const cutIn = (text) => /CUT: (\d+)/.exec(text ?? "")?.[1] ?? null;
@@ -120,6 +179,11 @@ async function handle(u) {
       return done ? afterClip(done, true) : say("That request is already answered or closed.");
     }
     if (verdict === "cc") { ccTap(q, key).catch((e) => say(`cc: ${e.message}`)); return; }
+    if (verdict === "asset") {
+      await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
+      const b = ccButtons.get(key);
+      return b?.assets ? takeAssets(b.assets, cut) : say("That button is from before a restart; send the files again.");
+    }
     if (verdict === "posted" || verdict === "retry") {
       await tg("editMessageReplyMarkup", { chat_id: chatId, message_id: q.message.message_id }).catch(() => {});
       return say(resolveHandoff(key, verdict));
@@ -137,6 +201,7 @@ async function handle(u) {
   const m = u.message;
   if (!m || String(m.chat.id) !== chatId) return;
   if (await clipArrived(m)) return;
+  if (await assetArrived(m)) return;
   if (!m.text) return;
   const text = m.text.trim();
   const word = text.toLowerCase();

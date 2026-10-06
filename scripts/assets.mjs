@@ -14,7 +14,7 @@
 // catalogued once. Descriptions come from Claude looking at a contact sheet of 20 frames at a time.
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { DIR, load, save } from "./clips.mjs";
 import { config, projectWorkspace, tool } from "../src/config.js";
@@ -102,6 +102,26 @@ export function scan(only = null) {
   const kept = all.filter((e) => e.kind !== "asset" || existsSync(e.file));
   save(kept);
   return counts;
+}
+
+// A file sent in (from Telegram): copied into the project's workspace (assets/telegram/) and
+// catalogued at once. A description given replaces Claude's; tags are extra search words. The
+// same file sent again isn't kept twice: the catalogued one gets the new description instead.
+export function ingest(project, src, name, { description = null, tags = null } = {}) {
+  const ws = workspaces()[project];
+  if (!ws) throw new Error(`${project} has no workspace`);
+  const file = join(ws.root, "assets", "telegram", name);
+  mkdirSync(dirname(file), { recursive: true });
+  copyFileSync(src, file);
+  scan(project);
+  const all = load(), e = all.find((x) => x.kind === "asset" && (x.file === file || x.copies?.includes(file)));
+  const dup = !!e && e.file !== file;
+  if (dup) { rmSync(file, { force: true }); e.copies = e.copies.filter((c) => c !== file); }
+  else if (!e) { rmSync(file, { force: true }); return null; }   // too small, or a finished video
+  if (description) e.description = description;
+  e.tags = [e.description, tags, pathWords(e.rel ?? "")].filter(Boolean).join(" ");
+  save(all);
+  return { entry: e, dup };
 }
 
 function sheetImage(tiles, out, cols = 5) {
