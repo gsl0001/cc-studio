@@ -32,7 +32,14 @@ if (existsSync(join(ROOT, ".env"))) for (const line of readFileSync(join(ROOT, "
 
 const STOP = new Set("a an the and or of in on at to for with by from is are be this that it its as into over under up down out off while very just".split(" "));
 export const words = (s) => [...new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
-  .filter((w) => w.length > 1 && !STOP.has(w)).map((w) => w.replace(/(ies)$/, "y").replace(/([^s])s$/, "$1")))];
+  .filter((w) => w.length > 1 && !STOP.has(w)).map(stem))];
+// "opening" ~ "open", "walls" ~ "wall", "framed" ~ "frame": close enough to match on.
+function stem(w) {
+  if (w.length > 5 && w.endsWith("ing")) return w.slice(0, -3);
+  if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`;
+  if (w.length > 4 && w.endsWith("ed")) return w.slice(0, -1).replace(/e$/, "");
+  return w.length > 3 ? w.replace(/([^s])s$/, "$1").replace(/e$/, "") : w;
+}
 
 export const load = () => (existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : []);
 export const save = (all) => { mkdirSync(DIR, { recursive: true }); writeFileSync(INDEX, JSON.stringify(all, null, 2) + "\n"); };
@@ -186,7 +193,7 @@ export function thumb(file, duration) {
   mkdirSync(THUMBS, { recursive: true });
   const out = join(THUMBS, `${basename(file, extname(file))}.jpg`);
   if (!existsSync(out)) {
-    try { execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", String((duration || 2) / 2), "-i", file, "-frames:v", "1", "-vf", "scale=360:-2", out]); } catch { return null; }
+    try { execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", String((duration || 2) / 2), "-i", file, "-frames:v", "1", "-vf", "scale=360:-2", out], { stdio: "ignore" }); } catch { return null; }
   }
   return out;
 }
@@ -203,7 +210,9 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
   const fits = (e) => !e.duration || e.duration >= seconds;
   const own = (e) => (e.kind === "asset" ? 0 : 1);   // the project's own screens, photos and takes before any stock
   let picks = all.filter((e) => existsSync(e.file) && fits(e) && (e.kind !== "asset" || !project || e.project === project))
-    .map((e) => ({ e, s: score(e, query) })).filter((x) => x.s >= 0.5)
+    // Your own assets are offered on looser matches (the creator looks at the frames anyway);
+    // stock needs half the words.
+    .map((e) => ({ e, s: score(e, query) })).filter((x) => x.s >= (x.e.kind === "asset" ? 0.2 : 0.5))
     .sort((a, b) => own(a.e) - own(b.e) || recentlyUsed(a.e, project) - recentlyUsed(b.e, project) || b.s - a.s).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
   const errors = [];
   if (picks.length < count) {
@@ -242,7 +251,7 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
     }
     save(all);
   }
-  return { picks: picks.map((p) => ({ ...p, thumb: thumb(p.file, p.duration) })), errors,
+  return { picks: picks.map((p) => ({ ...p, thumb: p.thumb && existsSync(p.thumb) ? p.thumb : thumb(p.file, p.duration) })), errors,
     keys: [process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean) };
 }
 
@@ -254,7 +263,7 @@ if (import.meta.filename === process.argv[1]) {
     const query = args.join(" ").trim();
     if (!query) { console.error('say what the scene shows: node scripts/clips.mjs find "rain on a window at night"'); process.exit(2); }
     const r = await find(query, { seconds, count, project });
-    if (!r.picks.length) console.log(`No clip for "${query}"${r.keys.length ? "" : " (library only: no PEXELS_API_KEY or PIXABAY_API_KEY set)"}. Try other words, or make the scene.`);
+    if (!r.picks.length) console.log(`No clip for "${query}" in your material, the library or the free sources${r.keys.length ? "" : " (Pexels and Pixabay not searched: no keys)"}. Try other words, look at the contact sheets, or make the scene.`);
     for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
     for (const e of r.errors) console.log(`(skipped: ${e})`);
   } else if (cmd === "used") {
@@ -282,7 +291,9 @@ if (import.meta.filename === process.argv[1]) {
     console.log(`${all.length} clip(s) in ${DIR}`);
   } else if (cmd === "test") {
     const assert = (await import("node:assert/strict")).default;
-    assert.deepEqual(words("Rain falling on the windows at night"), ["rain", "falling", "window", "night"]);
+    assert.deepEqual(words("Rain falling on the windows at night"), ["rain", "fall", "window", "night"]);
+    assert.deepEqual(words("opening framed walls"), ["open", "fram", "wall"]);
+    assert.deepEqual(words("frame wall opens"), ["fram", "wall", "open"]);
     assert.equal(score({ tags: "rain, window, night, city" }, "rain on a window"), 1);
     assert.equal(score({ tags: "office desk laptop" }, "rain on a window"), 0);
     assert.equal(bestFile([{ link: "a", width: 3840, height: 2160 }, { link: "b", width: 1080, height: 1920 }, { link: "c", width: 720, height: 1280 }]).link, "b");
