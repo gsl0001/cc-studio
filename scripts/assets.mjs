@@ -126,8 +126,8 @@ export function describe(only = null, { limit = Infinity, log = console.log } = 
     const msg = { type: "user", message: { role: "user", content: [
       { type: "image", source: { type: "base64", media_type: "image/jpeg", data: readFileSync(sheet).toString("base64") } },
       { type: "text", text: prompt }] } };
-    const r = spawnSync("claude", ["-p", "--model", MODEL, "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-      "--strict-mcp-config", "--no-session-persistence"], { input: JSON.stringify(msg) + "\n", encoding: "utf8", shell: true, timeout: 180_000, maxBuffer: 1 << 24 });
+    // One command string: claude is a .cmd shim on Windows, so it runs through the shell.
+    const r = spawnSync(`claude -p --model ${MODEL} --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --no-session-persistence`, { input: JSON.stringify(msg) + "\n", encoding: "utf8", shell: true, timeout: 180_000, maxBuffer: 1 << 24 });
     const result = (r.stdout ?? "").split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((j) => j?.type === "result")?.result ?? "";
     const lines = new Map([...result.matchAll(/^\s*(\d+)\s*[:.)-]\s*(.+)$/gm)].map((m) => [Number(m[1]), m[2].trim()]));
     if (!lines.size) { log(`describe: no answer for ${project} (${(r.stderr || "").slice(0, 200)})`); return done; }
