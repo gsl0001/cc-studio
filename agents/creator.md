@@ -63,7 +63,8 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
      footage (Pexels and Pixabay when their keys are set, Wikimedia Commons' public-domain
      clips and NASA's library always; all free for commercial use, no credit needed),
      downloading what fits, each with a frame. **Look at the frames**; use a result only if it
-     really shows the scene, and try other words once if nothing fits.
+     really shows the scene, and try other words once if nothing fits. A longer video lists what
+     happens second by second ("all of it"); cut just the stretch you need (`ffmpeg -ss <start> -to <end>`).
   2. For **every** asset or clip you use (your own or stock), run
      `node scripts/clips.mjs used <file> KEY`: the least used come first next time, which
      keeps videos looking different. List stock clips (source and page) in the post package.

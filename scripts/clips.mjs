@@ -215,7 +215,9 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
     .map((e) => {   // a long video is as good as its best stretch for these words
       const best = (e.segments ?? []).map((g) => ({ g, s: score({ tags: `${g.text} ${e.description ?? ""}` }, query) })).sort((a, b) => b.s - a.s)[0];
       const whole = score(e, query);
-      return best && best.s >= whole ? { e: { ...e, part: best.g }, s: best.s } : { e, s: whole };
+      // the whole video's words span every stretch, so it ranks on the larger score and always
+      // names its best stretch: that's the part to cut
+      return best?.s > 0 ? { e: { ...e, part: best.g }, s: Math.max(best.s, whole) } : { e, s: whole };
     }).filter((x) => x.s >= (x.e.kind === "asset" ? 0.2 : 0.5))
     .sort((a, b) => own(a.e) - own(b.e) || recentlyUsed(a.e, project) - recentlyUsed(b.e, project) || b.s - a.s).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
   const errors = [];
@@ -268,7 +270,7 @@ if (import.meta.filename === process.argv[1]) {
     if (!query) { console.error('say what the scene shows: node scripts/clips.mjs find "rain on a window at night"'); process.exit(2); }
     const r = await find(query, { seconds, count, project });
     if (!r.picks.length) console.log(`No clip for "${query}" in your material, the library or the free sources${r.keys.length ? "" : " (Pexels and Pixabay not searched: no keys)"}. Try other words, look at the contact sheets, or make the scene.`);
-    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}${p.part ? `\n  best part: ${p.part.from}-${p.part.to}s: ${p.part.text}` : ""}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
+    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}${p.part ? `\n  best match: ${p.part.from}-${p.part.to}s: ${p.part.text}` : ""}${p.segments?.length ? `\n  all of it:${p.segments.map((g) => `\n    ${g.from}-${g.to}s ${g.text}`).join("")}` : ""}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
     for (const e of r.errors) console.log(`(skipped: ${e})`);
   } else if (cmd === "used") {
     const [file, key] = args, all = load(), e = all.find((x) => resolve(x.file) === resolve(file ?? ""));
