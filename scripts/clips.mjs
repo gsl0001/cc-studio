@@ -346,11 +346,11 @@ if (import.meta.filename === process.argv[1]) {
     assert.equal(bestFile([{ link: "a", width: 1920, height: 1080 }, { link: "b", width: 1280, height: 720 }]).link, "a");
     const day = 86_400_000, ago = (d) => new Date(Date.now() - d * day).toISOString();
     const vid = { segments: [{ from: 0, to: 6, text: "a" }, { from: 6, to: 12, text: "b" }, { from: 12, to: 18, text: "c" }] };
-    assert.equal(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(3), from: 6, to: 12 }] }, "recno").segments.length, 2, "a used stretch drops out");
-    assert.equal(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(3) }] }, "recno"), null, "a whole-file use hides it");
-    assert.ok(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(20) }] }, "recno"), "older than 14 days is fresh again");
-    assert.ok(fresh({ used: [{ key: "gola-tiktok-x", project: "gola", at: ago(1) }] }, "recno"), "another project's use doesn't count");
-    assert.equal(fresh({ used: [{ key: "recno-tiktok-x", at: ago(1) }] }, "recno"), null, "an old record without project uses the key");
+    assert.equal(fresh({ ...vid, used: [{ key: "acme-tiktok-x", project: "acme", at: ago(3), from: 6, to: 12 }] }, "acme").segments.length, 2, "a used stretch drops out");
+    assert.equal(fresh({ ...vid, used: [{ key: "acme-tiktok-x", project: "acme", at: ago(3) }] }, "acme"), null, "a whole-file use hides it");
+    assert.ok(fresh({ ...vid, used: [{ key: "acme-tiktok-x", project: "acme", at: ago(20) }] }, "acme"), "older than 14 days is fresh again");
+    assert.ok(fresh({ used: [{ key: "notes-tiktok-x", project: "notes", at: ago(1) }] }, "acme"), "another project's use doesn't count");
+    assert.equal(fresh({ used: [{ key: "acme-tiktok-x", at: ago(1) }] }, "acme"), null, "an old record without project uses the key");
     assert.deepEqual(parseUses("C:/a b/x.mp4@12-16.5; y.png"), [{ file: "C:/a b/x.mp4", from: 12, to: 16.5 }, { file: "y.png", from: null, to: null }]);
     console.log("clips ok");
   } else {

@@ -108,8 +108,8 @@ async function clipArrived(m) {
 }
 
 // Photos, screenshots and videos sent here (not answering a clip request) become a project's
-// assets. The caption's first word names the project ("acme settings screen, dark mode
-// St"), the rest describes it; with no project named, buttons ask. An album is asked about once,
+// assets. The caption's first word names the project ("acme settings screen, dark
+// mode"), the rest describes it; with no project named, buttons ask. An album is asked about once,
 // and its caption becomes search words (Claude describes each item).
 const projects = () => Object.entries(workspaces()).map(([id, w]) => ({ id, name: w.name }));
 function projectIn(caption) {
