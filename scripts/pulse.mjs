@@ -17,6 +17,7 @@ import { liftExpired } from "../src/pause.js";
 import { nextWeek } from "../auto_content_pipeline/src/schema.js";
 import { decide, relocateFinal, schedule, sendForReview, sendHandoff } from "./posts.mjs";
 import { sweepInbox } from "./clips.mjs";
+import { stock, stockLine, workspaces } from "./assets.mjs";
 import { creatorRunning, nextPost, QUOTA } from "./creator.mjs";
 
 lifecycle();
@@ -50,6 +51,20 @@ if (scanAge > 6 * HOUR && existsSync("library/clips")) {
   writeFileSync(scanMark, new Date().toISOString());   // marked now, so the next pulse doesn't start a second scan
   detached("scripts/assets.mjs", ["scan"]);
   tell("Rescanning the workspaces for new assets.");
+}
+// Fresh material running low: tell the owner what to shoot, at most once a week per project.
+{
+  const markFile = "library/clips/.stock-alerts.json";
+  const marks = existsSync(markFile) ? JSON.parse(readFileSync(markFile, "utf8")) : {};
+  for (const p of Object.keys(workspaces())) {
+    const s = stock(p);
+    if (!s.low || Date.now() - Date.parse(marks[p] ?? 0) < 7 * 24 * HOUR) continue;
+    await notify(`📦 Fresh material is running low. ${stockLine(s)}
+Shoot or record a few new ones and drop them in the workspace's assets folder; they're catalogued within 6 hours (or say "scan assets").`);
+    marks[p] = new Date().toISOString();
+    writeFileSync(markFile, JSON.stringify(marks, null, 2));
+    tell(`stock alert: ${stockLine(s)}`);
+  }
 }
 
 // 0. The Telegram bot is how approvals arrive: restart it if its heartbeat is stale

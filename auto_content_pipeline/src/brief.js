@@ -156,8 +156,10 @@ const CATALOGUE = new URL("../../library/clips/index.json", import.meta.url);
 export function visualInventory(project) {
   const assets = existsSync(CATALOGUE) ? JSON.parse(readFileSync(CATALOGUE, "utf8")).filter((e) => e.kind === "asset" && e.project === project && existsSync(e.file)) : [];
   if (assets.length) {
-    return assets.sort((a, b) => (a.used?.length ?? 0) - (b.used?.length ?? 0)).slice(0, 150)
-      .map((e) => `${e.rel.replace(/\\/g, "/")}${e.description ? ` (${e.description})` : ""}`);
+    const mine = (e) => (e.used ?? []).filter((u) => (u.project ?? u.key?.split("-")[0]) === project);
+    const history = (e) => { const u = mine(e); return u.length ? `used ${u.length}x, last ${u.map((x) => x.at).sort().at(-1).slice(0, 10)}` : "unused"; };
+    return assets.sort((a, b) => mine(a).length - mine(b).length).slice(0, 150)
+      .map((e) => `${e.rel.replace(/\\/g, "/")}${e.description ? ` (${e.description})` : ""} [${history(e)}]`);
   }
   const profile = loadRegistry().projects.find((p) => p.id === project);
   const root = profile ? projectWorkspace(profile) : null;

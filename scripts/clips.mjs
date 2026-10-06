@@ -5,7 +5,7 @@
 // fits into the library, and prints each clip with a frame to look at.
 //
 //   node scripts/clips.mjs find "<what the scene shows>" [--seconds 4] [--count 3] [--project <id>]
-//   node scripts/clips.mjs used <clip file> <post key>     record a use (keeps reuse down)
+//   node scripts/clips.mjs used <file>[@start-end] <post key>   record a use (the hand-off does it)
 //   node scripts/clips.mjs add <file> "<what it shows>"    put your own footage in the library
 //   node scripts/clips.mjs request "<scene>" --key <post key> [--seconds 4]
 //                                     nothing fits: ask the user (Telegram) for a clip, with
@@ -49,8 +49,40 @@ export function score(entry, query) {
   const q = words(query), have = new Set(words(`${entry.tags} ${entry.query ?? ""}`));
   return q.length ? q.filter((w) => have.has(w)).length / q.length : 0;
 }
-const recentlyUsed = (e, project) => (e.used ?? []).some((u) => (!project || u.key.startsWith(project))
-  && Date.now() - Date.parse(u.at) < REUSE_DAYS * 86_400_000);
+const HIDE_DAYS = 14;    // used by this project this recently: not offered unless asked (--reuse)
+const usedBy = (u, project) => !project || (u.project ?? u.key?.split("-")[0]) === project;
+const recentUses = (e, project, days) => (e.used ?? []).filter((u) => usedBy(u, project) && Date.now() - Date.parse(u.at) < days * 86_400_000);
+const recentlyUsed = (e, project) => recentUses(e, project, REUSE_DAYS).length > 0;
+const overlaps = (a, b) => a.from < b.to && b.from < a.to;
+// What of an entry is still fresh for this project: null when nothing is (the whole file was
+// used, or every stretch overlaps a recent use); else the entry, its stretches cut to the fresh ones.
+export function fresh(e, project, days = HIDE_DAYS) {
+  const uses = recentUses(e, project, days);
+  if (!uses.length) return e;
+  if (uses.some((u) => u.from == null) || !e.segments?.length) return null;
+  const left = e.segments.filter((g) => !uses.some((u) => overlaps(g, u)));
+  return left.length ? { ...e, segments: left, partlyUsed: uses.map((u) => `${u.from}-${u.to}s`) } : null;
+}
+export const usageLine = (e, project) => {
+  const u = (e.used ?? []).filter((x) => usedBy(x, project));
+  if (!u.length) return "never used";
+  const last = u.map((x) => x.at).sort().at(-1);
+  return `used ${u.length}x, last ${new Date(last).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+};
+// "file@12-16.5; other.png" -> [{ file, from, to }]: what a finished video used.
+export const parseUses = (list) => String(list ?? "").split(";").map((x) => x.trim()).filter(Boolean).map((x) => {
+  const m = /^(.*?)(?:@(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?))?$/.exec(x);
+  return { file: m[1].trim().replace(/^["']|["']$/g, ""), from: m[2] == null ? null : Number(m[2]), to: m[3] == null ? null : Number(m[3]) };
+});
+// Records one use; returns the entry, or null when the file isn't in the library or catalogue.
+export function recordUse(file, key, { from = null, to = null, project = null } = {}) {
+  const all = load(), want = resolve(file).toLowerCase();
+  const e = all.find((x) => resolve(x.file).toLowerCase() === want || (x.copies ?? []).some((c) => resolve(c).toLowerCase() === want));
+  if (!e) return null;
+  e.used = [...(e.used ?? []), { key, project: project ?? e.project ?? key.split("-")[0], at: new Date().toISOString(), ...(from != null ? { from, to } : {}) }];
+  save(all);
+  return e;
+}
 
 // The best rendition of a stock video for a 1080x1920 frame: portrait first, then the
 // smallest one at least 1080 px on its short side (else the biggest there is).
@@ -205,8 +237,14 @@ export const probe = (file) => {
   } catch { return {}; }
 };
 
-async function find(query, { seconds = 3, count = 3, project = null }) {
-  const all = load();
+async function find(query, { seconds = 3, count = 3, project = null, reuse = null }) {
+  let hidden = 0;
+  const all = load().map((e) => {
+    if (reuse || !existsSync(e.file)) return e;
+    const f = fresh(e, project);
+    if (!f) hidden++;
+    return f;
+  }).filter(Boolean);
   const fits = (e) => !e.duration || e.duration >= seconds;
   const own = (e) => (e.kind === "asset" ? 0 : 1);   // the project's own screens, photos and takes before any stock
   let picks = all.filter((e) => existsSync(e.file) && fits(e) && (e.kind !== "asset" || !project || e.project === project))
@@ -219,7 +257,9 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
       // names its best stretch: that's the part to cut
       return best?.s > 0 ? { e: { ...e, part: best.g }, s: Math.max(best.s, whole) } : { e, s: whole };
     }).filter((x) => x.s >= (x.e.kind === "asset" ? 0.2 : 0.5))
-    .sort((a, b) => own(a.e) - own(b.e) || recentlyUsed(a.e, project) - recentlyUsed(b.e, project) || b.s - a.s).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
+    // used by this project in the last 30 days costs a little relevance, not its place: a long
+    // video's fresh stretches still win when they fit best
+    .sort((a, b) => own(a.e) - own(b.e) || (b.s - 0.3 * recentlyUsed(b.e, project)) - (a.s - 0.3 * recentlyUsed(a.e, project))).slice(0, count).map((x) => ({ ...x.e, from: "library" }));
   const errors = [];
   if (picks.length < count) {
     const found = [];
@@ -227,7 +267,7 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
       if (found.filter((c) => !c.duration || c.duration >= seconds).length >= count * 3) break;
       found.push(...await src(query, src === nasa ? 3 : 10).catch((e) => { errors.push(e.message); return []; }));
     }
-    const seen = new Set(all.map((e) => e.id));
+    const seen = new Set(load().map((e) => e.id));
     const order = (c) => ["Pexels", "Pixabay", "Wikimedia Commons", "NASA"].indexOf(c.source) * 2 + (c.height >= c.width ? 0 : 1);
     for (const c of found.filter((c) => (!c.duration || c.duration >= seconds) && !seen.has(c.id)).sort((a, b) => order(a) - order(b))) {
       if (picks.length >= count) break;
@@ -252,12 +292,11 @@ async function find(query, { seconds = 3, count = 3, project = null }) {
       if (c.duration && c.duration < seconds) { rmSync(file, { force: true }); continue; }
       const { link, ...meta } = c;
       const entry = { ...meta, file, query, added: new Date().toISOString(), used: [] };
-      all.push(entry); seen.add(c.id);
+      const lib = load(); lib.push(entry); save(lib); seen.add(c.id);
       picks.push({ ...entry, from: c.source });
     }
-    save(all);
   }
-  return { picks: picks.map((p) => ({ ...p, thumb: p.thumb && existsSync(p.thumb) ? p.thumb : thumb(p.file, p.duration) })), errors,
+  return { hidden, picks: picks.map((p) => ({ ...p, thumb: p.thumb && existsSync(p.thumb) ? p.thumb : thumb(p.file, p.duration) })), errors,
     keys: [process.env.PEXELS_API_KEY && "Pexels", process.env.PIXABAY_API_KEY && "Pixabay"].filter(Boolean) };
 }
 
@@ -265,18 +304,19 @@ if (import.meta.filename === process.argv[1]) {
   const [cmd, ...args] = process.argv.slice(2);
   const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : def; };
   if (cmd === "find") {
-    const seconds = Number(opt("seconds", 3)), count = Number(opt("count", 3)), project = opt("project", null);
+    const seconds = Number(opt("seconds", 3)), count = Number(opt("count", 3)), project = opt("project", null), reuse = opt("reuse", null);
     const query = args.join(" ").trim();
     if (!query) { console.error('say what the scene shows: node scripts/clips.mjs find "rain on a window at night"'); process.exit(2); }
-    const r = await find(query, { seconds, count, project });
+    const r = await find(query, { seconds, count, project, reuse });
     if (!r.picks.length) console.log(`No clip for "${query}" in your material, the library or the free sources${r.keys.length ? "" : " (Pexels and Pixabay not searched: no keys)"}. Try other words, look at the contact sheets, or make the scene.`);
-    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}${p.part ? `\n  best match: ${p.part.from}-${p.part.to}s: ${p.part.text}` : ""}${p.segments?.length ? `\n  all of it:${p.segments.map((g) => `\n    ${g.from}-${g.to}s ${g.text}`).join("")}` : ""}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}${recentlyUsed(p, project) ? "\n  NOTE: this project used it in the last 30 days" : ""}`);
+    for (const p of r.picks) console.log(`${p.file}\n  ${p.from === "library" ? `library (${p.source})` : `new from ${p.from}`} · ${p.width}x${p.height}${p.duration ? ` · ${p.duration}s` : " · image"} · ${p.description ?? p.tags}${p.part ? `\n  best match: ${p.part.from}-${p.part.to}s: ${p.part.text}` : ""}${p.segments?.length ? `\n  all of it:${p.segments.map((g) => `\n    ${g.from}-${g.to}s ${g.text}`).join("")}` : ""}\n  look at: ${p.thumb ?? "(no frame)"}\n  ${p.license}${p.author ? ` · by ${p.author}` : ""}${p.page ? ` · ${p.page}` : ""}\n  ${usageLine(p, project)}${p.partlyUsed ? ` (recently used stretches left out: ${p.partlyUsed.join(", ")})` : ""}`);
     for (const e of r.errors) console.log(`(skipped: ${e})`);
+    if (r.hidden) console.log(`(${r.hidden} match${r.hidden > 1 ? "es" : ""} hidden: used by ${project ?? "a project"} in the last ${HIDE_DAYS} days. Only if nothing fresh works: add --reuse "<why>".)`);
   } else if (cmd === "used") {
-    const [file, key] = args, all = load(), e = all.find((x) => resolve(x.file) === resolve(file ?? ""));
-    if (!e || !key) { console.error("usage: used <clip file from the library> <post key>"); process.exit(2); }
-    e.used = [...(e.used ?? []), { key, at: new Date().toISOString() }];
-    save(all); console.log(`recorded: ${basename(e.file)} in ${key}`);
+    const [spec, key] = args, [u] = parseUses(spec ?? "");
+    const e = u && key ? recordUse(u.file, key, u) : null;
+    if (!e) { console.error("usage: used <file>[@start-end] <post key>   (a file from the library or catalogue)"); process.exit(2); }
+    console.log(`recorded: ${basename(e.file)}${u.from != null ? ` ${u.from}-${u.to}s` : ""} in ${key}`);
   } else if (cmd === "add") {
     const [src, ...desc] = args;
     if (!src || !existsSync(src) || !desc.length) { console.error('usage: add <video file> "<what it shows>"'); process.exit(2); }
@@ -304,6 +344,14 @@ if (import.meta.filename === process.argv[1]) {
     assert.equal(score({ tags: "office desk laptop" }, "rain on a window"), 0);
     assert.equal(bestFile([{ link: "a", width: 3840, height: 2160 }, { link: "b", width: 1080, height: 1920 }, { link: "c", width: 720, height: 1280 }]).link, "b");
     assert.equal(bestFile([{ link: "a", width: 1920, height: 1080 }, { link: "b", width: 1280, height: 720 }]).link, "a");
+    const day = 86_400_000, ago = (d) => new Date(Date.now() - d * day).toISOString();
+    const vid = { segments: [{ from: 0, to: 6, text: "a" }, { from: 6, to: 12, text: "b" }, { from: 12, to: 18, text: "c" }] };
+    assert.equal(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(3), from: 6, to: 12 }] }, "recno").segments.length, 2, "a used stretch drops out");
+    assert.equal(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(3) }] }, "recno"), null, "a whole-file use hides it");
+    assert.ok(fresh({ ...vid, used: [{ key: "recno-tiktok-x", project: "recno", at: ago(20) }] }, "recno"), "older than 14 days is fresh again");
+    assert.ok(fresh({ used: [{ key: "gola-tiktok-x", project: "gola", at: ago(1) }] }, "recno"), "another project's use doesn't count");
+    assert.equal(fresh({ used: [{ key: "recno-tiktok-x", at: ago(1) }] }, "recno"), null, "an old record without project uses the key");
+    assert.deepEqual(parseUses("C:/a b/x.mp4@12-16.5; y.png"), [{ file: "C:/a b/x.mp4", from: 12, to: 16.5 }, { file: "y.png", from: null, to: null }]);
     console.log("clips ok");
   } else {
     console.log(readFileSync(import.meta.filename, "utf8").split("\n").slice(0, 13).join("\n").replace(/^\/\/ ?/gm, ""));

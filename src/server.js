@@ -14,6 +14,7 @@ import { ROOT, config, model, projectWorkspace, rootPath } from "./config.js";
 import { loadRegistry } from "./registry.js";
 import { niceWhen, pause, pauseEnd, pausedUntil } from "./pause.js";
 import { openRequests, searchLinks } from "../scripts/clips.mjs";
+import { stock, stockLine, workspaces } from "../scripts/assets.mjs";
 import { dayIn, describeOff, daysOff, isDayOff, matches, niceDay, postDay, postRef, saveDaysOff, weekdayIn, weekdayName } from "./controls.js";
 import { decide, nextVideo, resolveHandoff } from "../scripts/posts.mjs";
 import { creatorRunning, nextPost } from "../scripts/creator.mjs";
@@ -731,6 +732,11 @@ function quick(text, st, via = "cc") {
     spawn(process.execPath, ["scripts/assets.mjs", "scan"], { detached: true, windowsHide: true, stdio: ["ignore", out, out] }).unref();
     return { reply: "Scanning the workspaces. New screens, photos and takes get described and added to the contact sheets in a few minutes." };
   }
+  if (/^((asset|assets|material|footage) (stock|left|supply)|what('?s| is) running (low|thin)|how much (fresh )?material( is left)?)$/.test(w)) {
+    const all = Object.keys(workspaces()).map(stock);
+    const verdict = all.some((s) => s.low) ? "Worth shooting some new material for the ones running thin." : "Plenty of fresh material.";
+    return { reply: all.length ? [...all.map(stockLine), verdict].join("\n") : "No catalogued workspaces yet." };
+  }
   if (/^(clip requests?|requests|what clips? (do you|does cc) need|clips? needed)$/.test(w)) {
     const open = openRequests();
     const one = (r) => [`${r.query} (${r.seconds}s+${r.key ? `, for ${r.key}` : ""})`, ...searchLinks(r.query).map(([n, u]) => `${n}: ${u}`)].join("\n");
@@ -800,7 +806,7 @@ const HELP = `Here's what I can do. Tap a control, or type or say it:
   caption for <account> Friday: new caption, show me Friday's videos
 - days off: no posts on Sundays, skip Oct 12, days off, post on Sundays again
 - clips the creator asked you for: clip requests
-- new screens or footage in a workspace: scan assets (it also runs every 6 hours)
+- new screens or footage in a workspace: scan assets (it also runs every 6 hours); asset stock: how much is still fresh
 - open any folder: say folders to see them, or open and a project's workspace
 - for me: mute, unmute, size small, medium or large, clear chat
 Anything else, just ask in your own words.`;

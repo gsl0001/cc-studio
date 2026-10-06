@@ -193,6 +193,7 @@ The better the material, the better the videos:
 | `cancel <account> Oct 10` | drops one video from the queue (asks first; the file stays) |
 | `caption for <account> Friday: <new caption>` | changes a caption before upload (`caption for <account> Friday` reads it) |
 | `show me Friday's videos` | plays a queued video, or lists them as buttons |
+| `asset stock` | how much fresh material each project has, by kind (you also get a Telegram note when it runs low) |
 | `scan assets` | catalogues new screens, photos and takes in the workspaces now |
 | `clip requests` | the clips the creator asked you for, with search links (answer in Telegram by replying with the video) |
 | `no posts on Sundays`, `skip Oct 12`, `days off`, `post on Sundays again` | days off: nothing is planned or posted on them, and queued videos move to the next free day |

@@ -65,11 +65,13 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
      downloading what fits, each with a frame. **Look at the frames**; use a result only if it
      really shows the scene, and try other words once if nothing fits. A longer video lists what
      happens second by second ("all of it"); cut just the stretch you need (`ffmpeg -ss <start> -to <end>`).
-  2. For **every** asset or clip you use (your own or stock), run
-     `node scripts/clips.mjs used <file> KEY`: the least used come first next time, which
-     keeps videos looking different. List stock clips (source and page) in the post package.
-     Avoid anything marked as used by this project in the last 30 days. No stock clip with a
-     recognisable brand, logo or a person presented as using the product.
+  2. **Fresh material only.** Search leaves out what this project used in the last 14 days
+     (for a long video, only the stretches that were used), and lists each result's history
+     ("used 2x, last Oct 6"). Prefer the never-used. Only if nothing fresh works, search again
+     with `--reuse "<why>"`, and then change the shot (a different crop, stretch or speed) so it
+     doesn't look repeated. You don't record uses yourself: the hand-off does, from `--assets`.
+     List stock clips (source and page) in the post package. No stock clip with a recognisable
+     brand, logo or a person presented as using the product.
   3. If nothing fits, make the scene **another way with what you have** before asking anyone:
      animate the workspace's photos and screens (pan, zoom, split, before/after), motion
      graphics or kinetic type, a different visual that tells the same beat, or generated
@@ -106,7 +108,9 @@ Work in a new folder `{{WORKSPACE}}\<slug>\` (one folder per video).
   source, bytes, sha256, duration_seconds, streams from ffprobe) and one line to
   `{{FINALS}}\README.md` (`- [<slug>](PROJECT/<file>.mp4) - <one line: what it shows>`).
 - From `{{ROOT}}`: `node scripts/posts.mjs set KEY rendered --video <full path of the mp4
-  in the finals folder> --aigc <true|false> --note "<one line: what you made, plan sound>"`.
+  in the finals folder> --aigc <true|false>
+  --assets "<every asset and clip you used: file@start-end for footage you cut, file for a
+  still or a whole clip; separated by ;>" --note "<one line: what you made, plan sound>"`.
   `--aigc` is what you actually built, not what the plan guessed: true for realistic
   AI-generated people or scenes or a cloned real voice; false for a stock synthetic voice
   over real screens, photos, footage or motion graphics. The publisher sets the platform's

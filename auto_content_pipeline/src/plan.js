@@ -46,7 +46,7 @@ ${recentPosts.length ? recentPosts.map((r) => `- ${r.account} ${r.day} | ${r.for
 LAST EXPERIMENTS AND RESULTS (build on these; never rerun a test that already has a winner):
 ${experiments.length ? experiments.map((e) => `- ${e.account} ${e.week}: "${e.hypothesis}" (control: ${e.control_desc}; variant: ${e.variant_desc}) -> control ${e.control.avg_views ?? "?"} avg views (n=${e.control.n}), variant ${e.variant.avg_views ?? "?"} (n=${e.variant.n}): ${e.verdict}`).join("\n") : "(none yet)"}
 
-REAL SCREENS AND FOOTAGE PER BRAND (visuals should come from these or from scenes the creator can film or build; the creator never invents app UI):
+REAL SCREENS AND FOOTAGE PER BRAND (visuals should come from these or from scenes the creator can film or build; the creator never invents app UI; prefer the [unused] ones, and avoid anything used in the last two weeks):
 ${Object.entries(inventory).map(([pid, files]) => `${pid}: ${files.length ? files.join(", ") : "(none listed)"}`).join("\n") || "(none)"}
 
 BUSY SLOTS — other accounts already post at these times:

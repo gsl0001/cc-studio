@@ -7,6 +7,7 @@
 //   node scripts/assets.mjs sheets [--project <id>]                 contact sheets: library/sheets/
 //   node scripts/assets.mjs segments [--project <id>]               longer videos, moment by moment
 //   node scripts/assets.mjs list [--project <id>]
+//   node scripts/assets.mjs stock                                  fresh (unused in 30 days) material per project
 //
 // Skipped: finished videos (anything posted, by checksum, and 1080x1920 renders with sound
 // outside asset folders), extracted frames, build output, tiny images. Same file in two places:
@@ -208,6 +209,23 @@ export function sheets(only = null) {
   return made;
 }
 
+// How much fresh material a project has: assets unused for 30 days, by kind. Low when under a
+// third overall, or fewer than 5 of a kind that has at least 10.
+export function stock(project) {
+  const since = Date.now() - 30 * 86_400_000;
+  const items = load().filter((e) => e.kind === "asset" && e.project === project && existsSync(e.file));
+  const unused = (e) => !(e.used ?? []).some((u) => (u.project ?? e.project) === project && Date.parse(u.at) > since);
+  const kind = (e) => (e.duration ? "footage" : /[\\/](ui|screens?|screenshots)[\\/]/i.test(e.file) || /^(app )?screen/i.test(e.description ?? "") ? "app screens" : "photos and images");
+  const kinds = {};
+  for (const e of items) { const k = (kinds[kind(e)] ??= { total: 0, unused: 0 }); k.total++; if (unused(e)) k.unused++; }
+  const fresh = items.filter(unused).length, share = items.length ? fresh / items.length : 1;
+  const thin = Object.entries(kinds).filter(([, k]) => k.total >= 10 && k.unused < 5).map(([n]) => n);
+  return { project, total: items.length, fresh, share, kinds, thin, low: items.length > 0 && (share < 1 / 3 || thin.length > 0) };
+}
+export const stockLine = (s) => `${s.project}: ${s.fresh} of ${s.total} assets unused in 30 days (${Math.round(s.share * 100)}%). `
+  + Object.entries(s.kinds).map(([n, k]) => `${n}: ${k.unused}/${k.total} unused`).join(", ") + "."
+  + (s.thin.length ? ` Running thin: ${s.thin.join(", ")}.` : "");
+
 // The planner's view: each project's assets by path and description, least used first.
 export function inventory(project, max = 150) {
   return load().filter((e) => e.kind === "asset" && e.project === project && existsSync(e.file))
@@ -230,6 +248,8 @@ if (import.meta.filename === process.argv[1]) {
     writeFileSync(join(DIR, ".last-scan"), new Date().toISOString());
   } else if (cmd === "segments") {
     console.log(`${segmentVideos(project)} videos described moment by moment`);
+  } else if (cmd === "stock") {
+    for (const p of Object.keys(workspaces())) console.log(stockLine(stock(p)));
   } else if (cmd === "sheets") {
     for (const s of sheets(project)) console.log(s);
   } else if (cmd === "list") {

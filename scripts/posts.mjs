@@ -16,6 +16,7 @@ import { db, log } from "../src/db.js";
 import { loadRegistry } from "../src/registry.js";
 import { STATUSES } from "../auto_content_pipeline/src/schema.js";
 import { notify, sendVideo } from "../src/telegram.js";
+import { parseUses, recordUse } from "./clips.mjs";
 import { config, rootPath } from "../src/config.js";
 
 const row = (key) => db.prepare("SELECT * FROM week_plans WHERE key=?").get(key);
@@ -273,6 +274,19 @@ if (import.meta.filename === process.argv[1]) {
     if (flag("--video")) extra.video = flag("--video").replace(/\\/g, "/");
     if (flag("--note")) extra.note = flag("--note");
     if (flag("--aigc")) extra.is_aigc = flag("--aigc") === "true";
+    if (rest[0] === "rendered") {
+      // What the video used is recorded here, at hand-off, so reuse never depends on memory.
+      const list = flag("--assets");
+      if (list === undefined) {
+        console.error(`Not marked rendered: list what the video uses with --assets "<file>[@start-end]; <file>" (every asset and clip, with the seconds you cut), or --assets none.`);
+        process.exit(2);
+      }
+      const account = loadRegistry().accounts.find((a) => a.id === row(key)?.account);
+      const uses = list.trim().toLowerCase() === "none" ? [] : parseUses(list);
+      const missing = uses.filter((u) => !recordUse(u.file, key, { ...u, project: account?.project }));
+      extra.assets = uses;
+      for (const u of missing) console.log(`(not in the catalogue or library, not tracked: ${u.file})`);
+    }
     setPost(key, rest[0], extra);
     console.log(`${key} -> ${rest[0]}`);
   } else if (cmd === "review") {
