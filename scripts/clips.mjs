@@ -17,7 +17,7 @@
 // .env or the environment. Without them it still searches the library, Wikimedia Commons
 // and NASA.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
 const ROOT = resolve(dirname(import.meta.filename), "..");   // the library is the repo's, whatever folder this runs from
@@ -41,8 +41,34 @@ function stem(w) {
   return w.length > 3 ? w.replace(/([^s])s$/, "$1").replace(/e$/, "") : w;
 }
 
-export const load = () => (existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : []);
-export const save = (all) => { mkdirSync(DIR, { recursive: true }); writeFileSync(INDEX, JSON.stringify(all, null, 2) + "\n"); };
+// Several processes edit the catalogue at once (the bot's Telegram intake, a scan describing, a
+// hand-off recording uses), each one loading it, changing a few entries and saving. So save()
+// writes only what its caller changed since that load(), onto the file as it is now: entries
+// changed, added or removed. Two callers changing the same entry: the later save wins.
+const loadedAs = new WeakMap();   // an array load() returned -> Map(id -> its JSON then)
+const readIndex = () => (existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : []);
+const snap = (all) => new Map(all.map((e) => [e.id, JSON.stringify(e)]));
+export const load = () => { const all = readIndex(); loadedAs.set(all, snap(all)); return all; };
+// Pure: the file now, as this caller found it, as this caller has it -> what to write.
+export function merge(current, before, mine) {
+  const byId = new Map(mine.map((e) => [e.id, e]));
+  const out = current.filter((e) => byId.has(e.id) || !before.has(e.id))
+    .map((e) => (byId.has(e.id) && JSON.stringify(byId.get(e.id)) !== before.get(e.id) ? byId.get(e.id) : e));
+  const have = new Set(out.map((e) => e.id));
+  return [...out, ...mine.filter((e) => !have.has(e.id) && !before.has(e.id))];
+}
+export function save(all) {
+  mkdirSync(DIR, { recursive: true });
+  const before = loadedAs.get(all), out = before ? merge(readIndex(), before, all) : all;
+  const tmp = `${INDEX}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(out, null, 2) + "\n");
+  // Renamed into place, so a reader never sees half a file. Windows refuses while another
+  // process has the file open for a moment, so it tries again briefly.
+  for (let i = 0; ; i++) {
+    try { renameSync(tmp, INDEX); break; } catch (e) { if (i >= 20) throw e; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); }
+  }
+  loadedAs.set(all, snap(all));
+}
 
 // How well a library clip fits the words: the share of the query's words it carries.
 export function score(entry, query) {
@@ -337,6 +363,12 @@ if (import.meta.filename === process.argv[1]) {
     console.log(`${all.length} clip(s) in ${DIR}`);
   } else if (cmd === "test") {
     const assert = (await import("node:assert/strict")).default;
+    // Two processes saving the catalogue: each keeps the other's changes.
+    const base = [{ id: "a", v: 1 }, { id: "b", v: 1 }, { id: "c", v: 1 }], was = snap(base);
+    const first = merge(base, was, [{ id: "a", v: 2 }, { id: "b", v: 1 }, { id: "c", v: 1 }, { id: "d", v: 1 }]);   // changed a, added d
+    const second = merge(first, was, [{ id: "a", v: 1 }, { id: "b", v: 9 }]);                                       // changed b, removed c
+    assert.deepEqual(second, [{ id: "a", v: 2 }, { id: "b", v: 9 }, { id: "d", v: 1 }], "neither save loses the other's change");
+    assert.deepEqual(merge([{ id: "a", v: 5 }], snap([{ id: "a", v: 1 }]), [{ id: "a", v: 1 }]), [{ id: "a", v: 5 }], "an untouched entry keeps the newer copy");
     assert.deepEqual(words("Rain falling on the windows at night"), ["rain", "fall", "window", "night"]);
     assert.deepEqual(words("opening framed walls"), ["open", "fram", "wall"]);
     assert.deepEqual(words("frame wall opens"), ["fram", "wall", "open"]);

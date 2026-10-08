@@ -99,8 +99,9 @@ export function scan(only = null) {
       if (known) Object.assign(known, entry); else { all.push(entry); byFile.set(f, entry); bySha.set(h, entry); c.added++; }
     }
   }
-  const kept = all.filter((e) => e.kind !== "asset" || existsSync(e.file));
-  save(kept);
+  // Files gone from disk drop out (in place: save() writes this caller's changes, removals included).
+  for (let i = all.length - 1; i >= 0; i--) if (all[i].kind === "asset" && !existsSync(all[i].file)) all.splice(i, 1);
+  save(all);
   return counts;
 }
 
